@@ -218,17 +218,30 @@ Branch name pattern: main
 
 ## 九、第一次推送
 
+> ⚠️ **在国内直连 GitHub 常常失败**（`Connection was reset` 之类）。
+> 遇到问题先看 **`docs/网络与Git配置.md`**，里面有针对本项目的排查过程，
+> 结论是：**配一次 SSH，之后代理怎么变都不用管。**
+
 ```bash
 git init -b main
 git add -A
 git commit -m "chore: 初始化项目结构"
 
-git remote add origin https://github.com/Hannahvictoriza092/eldercare-voice-agent.git
+git remote add origin git@github.com:Hannahvictoriza092/eldercare-voice-agent.git
 git push -u origin main
 ```
 
 > ⚠️ 在 GitHub 上新建仓库时**不要勾** "Add a README" / "Add .gitignore"，
 > 否则会和你本地的初始提交冲突。
+
+### 推送失败怎么办
+
+```powershell
+git remote -v                    # 确认是 git@github.com:... 而不是 https://
+ssh -T git@github.com            # 应该显示 "Hi 你的用户名!"
+```
+
+详细的排查流程见 `docs/网络与Git配置.md`。
 
 ---
 
