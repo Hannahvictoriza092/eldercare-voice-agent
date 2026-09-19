@@ -131,5 +131,21 @@ from common.domain import Person, MedicationLog, Incident, Notification, NotifyT
 ## 八、开工第一步
 
 1. 🔴 **先跟组长和两个队友确认共享事件流的读取方式**（这是你的阻塞点）
-2. 定下来之后，再复制 `medication_reminder/` 的 5 个文件开始改造
-3. 先用假数据把「生成周报」跑通，再接真实数据源
+2. 定下来之后，复制 `medication_reminder/` 的 5 个文件开始改造
+3. 在自己的 `__init__.py` 里加两行（这就是唯一的注册动作，**不用改任何公共文件**）：
+
+   ```python
+   from .skill import HealthReportSkill
+   SKILL = HealthReportSkill()
+   ```
+
+4. 验证一下被扫到了：
+
+   ```bash
+   python -c "import skills; print(skills.all_skills()); print('跳过:', skills.skipped_packages())"
+   ```
+
+5. 先用假数据把「生成周报」跑通，再接真实数据源
+
+> 💡 `skills/__init__.py` 是自动发现的，**你永远不需要改它**，所以不会和别人冲突。
+> 你的包现在还没写 `SKILL`，会被安静跳过——这样你不会影响另外两个人。

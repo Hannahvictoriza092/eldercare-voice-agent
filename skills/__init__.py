@@ -1,8 +1,25 @@
 """skill 包入口。
 
-import skills 之后，注册表里就装好了所有 skill。
-队友新增 skill 时，只要在这里加两行：import + register。
+import skills 之后，注册表里就自动装好了所有 skill。
+
+======================================================================
+★ 这个文件三个人都不需要改。
+======================================================================
+它自动扫描本目录下所有子包，凡是导出了模块级 `SKILL` 变量的，
+自动注册进注册表。所以新增 skill 只要在自己的文件夹里做事，
+不用碰任何公共文件，也就不会有合并冲突。
+
+【队友怎么加自己的 skill】
+在你的包（skills/your_skill/）的 __init__.py 里写：
+
+    from .skill import YourSkill
+    SKILL = YourSkill()
+
+就这两行，别的什么都不用管。没写 SKILL 的包会被安静跳过，
+所以你可以先建空文件夹，不会把系统搞挂。
 """
+
+from pathlib import Path
 
 from common import (
     BaseSkill,
@@ -10,34 +27,19 @@ from common import (
     SkillContext,
     SkillResult,
     all_skills,
+    discover,
     export_qwen_tools,
     find_by_tool_name,
     get,
     register,
     skill_index,
+    skipped_packages,
     unregister,
 )
 
-from .medication_reminder import MedicationReminderSkill
-
-# ======================================================================
-# 在这里注册所有 skill
-# 顺序无所谓，注册表按 name 索引。每人只加自己那一块，不要重排别人的行，
-# 否则每次合并都会冲突。
-# ======================================================================
-
-# --- 用药提醒（负责人：你） ---
-register(MedicationReminderSkill())
-
-# --- 呼救（负责人：队友 A） ---
-# 建好 skills/emergency_call/ 下的文件后，打开下面两行：
-# from .emergency_call import EmergencyCallSkill
-# register(EmergencyCallSkill())
-
-# --- 健康和照顾反馈（负责人：队友 B） ---
-# 注意：健康反馈依赖前两个 skill 产出的数据，建议最后接入
-# from .health_report import HealthReportSkill
-# register(HealthReportSkill())
+# 自动发现并注册（扫 skills/ 下的所有子包）
+_package_dir = Path(__file__).parent
+discover(__name__, _package_dir)
 
 __all__ = [
     "BaseSkill",
@@ -51,5 +53,5 @@ __all__ = [
     "skill_index",
     "export_qwen_tools",
     "find_by_tool_name",
-    "MedicationReminderSkill",
+    "skipped_packages",
 ]

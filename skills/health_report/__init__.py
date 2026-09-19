@@ -2,13 +2,20 @@
 
 负责人：队友 B
 
+============================================================
 ⚠️ 这个包目前是空的占位。实现步骤见本目录下的 README.md。
+============================================================
 
 依赖说明：本 skill 消费「用药提醒」和「呼救」产出的数据
 （common/domain.py 里的 MedicationLog / Incident），
 属于下游，应该最后接入。
 
-实现完成后，在 skills/__init__.py 里打开你那一块的两行：
-    from .health_report import HealthReportSkill
-    register(HealthReportSkill())
+【怎么让系统识别到你】
+文件都写好后，在下面加这么几行（这就是唯一的「注册」动作）：
+
+    from .skill import HealthReportSkill
+    SKILL = HealthReportSkill()
+
+skills/__init__.py 会自动扫描并注册，你不需要改任何公共文件。
+在没写 SKILL 之前，这个包会被安静跳过，不影响别人。
 """

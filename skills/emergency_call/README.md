@@ -115,7 +115,23 @@ from common.domain import Incident, IncidentStatus, IncidentType, Notification
 
 ## 八、开工第一步
 
-1. 先把 `skills/__init__.py` 里你那一块的两行注释打开
-2. 复制 `medication_reminder/` 的 5 个文件过来，改造成你的业务
-3. 先跑通一个最简单的 `trigger`（哪怕只返回一句固定的话），再逐步加功能
-4. 有疑问的地方，去 `docs/接口约定.md` 找，或者直接问
+1. 复制 `medication_reminder/` 的 5 个文件过来，改造成你的业务
+2. 在自己的 `__init__.py` 里加两行（这就是唯一的注册动作，**不用改任何公共文件**）：
+
+   ```python
+   from .skill import EmergencyCallSkill
+   SKILL = EmergencyCallSkill()
+   ```
+
+3. 验证一下被扫到了：
+
+   ```bash
+   python -c "import skills; print(skills.all_skills()); print('跳过:', skills.skipped_packages())"
+   ```
+
+   你的 skill 应该出现在 `all_skills()` 里，而不是 `skipped` 里。
+
+4. 先跑通一个最简单的 `trigger`（哪怕只返回一句固定的话），再逐步加功能
+5. 有疑问的地方，去 `docs/接口约定.md` 找，或者直接问
+
+> 💡 `skills/__init__.py` 是自动发现的，**你永远不需要改它**，所以不会和别人冲突。

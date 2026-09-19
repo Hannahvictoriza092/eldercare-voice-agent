@@ -34,11 +34,13 @@ from .domain import (
 from .registry import (
     all_skills,
     clear,
+    discover,
     export_qwen_tools,
     find_by_tool_name,
     get,
     register,
     skill_index,
+    skipped_packages,
     unregister,
 )
 from . import timefmt
@@ -56,6 +58,8 @@ __all__ = [
     "get",
     "all_skills",
     "clear",
+    "discover",
+    "skipped_packages",
     "skill_index",
     "export_qwen_tools",
     "find_by_tool_name",

@@ -2,9 +2,16 @@
 
 负责人：队友 A
 
+============================================================
 ⚠️ 这个包目前是空的占位。实现步骤见本目录下的 README.md。
+============================================================
 
-实现完成后，在 skills/__init__.py 里打开你那一块的两行：
-    from .emergency_call import EmergencyCallSkill
-    register(EmergencyCallSkill())
+【怎么让系统识别到你】
+文件都写好后，在下面加这么几行（这就是唯一的「注册」动作）：
+
+    from .skill import EmergencyCallSkill
+    SKILL = EmergencyCallSkill()
+
+skills/__init__.py 会自动扫描并注册，你不需要改任何公共文件。
+在没写 SKILL 之前，这个包会被安静跳过，不影响别人。
 """
