@@ -13,7 +13,7 @@
 
 | 模块 | 文件夹 | 谁在做 | 状态 |
 |---|---|---|---|
-| **用药提醒** | `skills/medication_reminder/` | （填名字） | ✅ 已完成 |
+| **用药提醒** | `skills/medication_reminder/` | （填名字） | ✅ 已完成，待优化 |
 | **呼救** | `skills/emergency_call/` | （填名字） | 🚧 待实现 |
 | **健康和照顾反馈** | `skills/health_report/` | （填名字） | 🚧 待实现 |
 | **共享契约层** | `common/` | 三个人一起 | ⚠️ 草案待定稿 |
