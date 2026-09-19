@@ -202,6 +202,7 @@ medication_reminder_create / _query / _update / _cancel / _confirm_taken
 
 | 文档 | 什么时候看 |
 |---|---|
+| `docs/网络与SSH配置.md` | ⚠️ **每个队员第一次 push 之前必看**（国内直连 GitHub 常失败） |
 | `docs/接口约定.md` | 写代码前必看，三人契约 |
 | `CONTRIBUTING.md` | 第一次提交代码前，以及遇到冲突时 |
 | `skills/*/README.md` | 开工前看自己那份 |
