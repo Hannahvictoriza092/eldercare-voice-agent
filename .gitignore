@@ -1,0 +1,32 @@
+# 运行时产生的数据（不要提交，否则每次跑测试都会产生 diff）
+data/
+*.corrupt.json
+
+# 密钥 —— 绝对不要提交，推到 GitHub 就删不干净了
+.env
+.env.*
+*.key
+secrets.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 编辑器
+.idea/
+.vscode/
+*.swp
+
+# 系统
+.DS_Store
+Thumbs.db

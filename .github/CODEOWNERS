@@ -1,0 +1,28 @@
+# CODEOWNERS
+#
+# 用途：记录各目录的负责人。GitHub 收到 PR 时会自动 @ 对应的人。
+#
+# 本仓库没有开启「强制审核」，这个文件不影响任何人提交代码，
+# 平时直接推 main 即可。开了临时分支做重构时它才会派上用场。
+#
+# ⚠️ 把占位符换成真实 GitHub 用户名：
+#      @Hannahvictoriza092  -> 用药提醒
+#      @teammate-a-id        -> 队友 A（呼救）
+#      @teammate-b-id        -> 队友 B（健康和照顾反馈）
+#
+# 语法：<路径模式>  <@用户名...>     越靠后的规则优先级越高
+
+# ---- 共享契约层：改动会影响所有人，建议在群里说一声 ----
+/common/                @Hannahvictoriza092 @teammate-a-id @teammate-b-id
+
+# ---- 各人的模块：自己负责 ----
+/skills/medication_reminder/    @Hannahvictoriza092
+/skills/emergency_call/         @teammate-a-id
+/skills/health_report/          @teammate-b-id
+
+# ---- 公共设施 ----
+/.github/               @Hannahvictoriza092
+/docs/                  @Hannahvictoriza092 @teammate-a-id @teammate-b-id
+
+# 注意：skills/__init__.py 不在上面任何一条里，
+# 因为它已经改成自动发现，谁都不需要再动它了。

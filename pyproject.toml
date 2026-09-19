@@ -1,0 +1,24 @@
+[project]
+name = "eldercare-voice-agent"
+version = "0.1.0"
+description = "面向独居老人的语音助手 —— skill 库与 Agent 调度"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+# 把仓库根目录加进 sys.path，这样 `pytest` 和 `python -m pytest` 都能跑，
+# 也能正常 import common / skills
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    name: 跑测试
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 跑测试
+        run: pytest
+
+      - name: 检查 Qwen tool schema 能否正常导出
+        # 这一步专门防「参数模型写错导致导出失败」——
+        # 测试全绿但 schema 导出不了的情况是存在的（比如字段名冲突）
+        run: python qwen_tools.py --all > /dev/null && echo "schema 导出正常"
+
+      - name: 检查所有字段都写了 description
+        # Qwen 靠 description 填参，缺了就会瞎猜。
+        # 这个检查在 tests/ 里也有，这里再做一遍是为了在 CI 上更显眼
+        run: |
+          python - <<'PY'
+          import sys
+          import skills
+
+          bad = []
+          for tool in skills.export_qwen_tools():
+              fn = tool["function"]
+              props = fn["parameters"].get("properties", {})
+              for name, spec in props.items():
+                  if not spec.get("description"):
+                      bad.append(f"{fn['name']}.{name}")
+
+          if bad:
+              print("以下字段缺少 description，Qwen 会填错：")
+              for b in bad:
+                  print("  -", b)
+              sys.exit(1)
+          print(f"检查通过，共 {len(skills.export_qwen_tools())} 个工具")
+          PY
