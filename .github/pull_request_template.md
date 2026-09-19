@@ -9,7 +9,7 @@
 
 <!-- 一句话说清楚。比如：完成呼救 skill 的发起呼救和进度查询 -->
 
-## 我负责的模块
+## 改动涉及的模块
 
 - [ ] 用药提醒（`skills/medication_reminder/`）
 - [ ] 呼救（`skills/emergency_call/`）
@@ -23,7 +23,7 @@
 - [ ] `python -m pytest` 全绿
 - [ ] 新增的参数字段**都写了 `description`**（Qwen 靠它填参）
 - [ ] 我的 `execute()` 任何情况下都返回 `SkillResult`，不往外抛异常
-- [ ] 我没有 import 别人 skill 的私有模块（只从 `common/` 导入）
+- [ ] 没有 import 其他 skill 的私有模块（只从 `common/` 导入）
 - [ ] 我的 skill 包在 `__init__.py` 里定义了 `SKILL = YourSkill()`（注意有括号）
 - [ ] 我改了 `common/` 的话，已经在群里通知了另外两人
 - [ ] 念给老人听的话里**没有英文、没有技术术语、没有 ISO 日期格式**

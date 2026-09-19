@@ -3,10 +3,10 @@
 【这一层为什么存在】
 项目规划里说「先建造一个 skill 库，要有 skill 名称、skill 需要的参数」。
 这个文件就是那个「库」的格式定义——三个 skill（用药提醒 / 呼救 / 健康和照顾反馈）
-都必须长成这个样子，否则注册表和 Qwen 的 tool schema 拼不到一起。
+都长成同一个样子，注册表和 Qwen 的 tool schema 才拼得起来。
 
-【给队友的话】
-如果你是负责「呼救」或「健康和照顾反馈」的，只需要：
+【怎么用】
+如果是写「呼救」或「健康和照顾反馈」，只需要：
   1. 继承 BaseSkill
   2. 用 Pydantic 定义每个 action 的参数模型，填进 ACTIONS
   3. 实现 execute()
@@ -108,7 +108,7 @@ def flatten_schema(schema: dict[str, Any]) -> dict[str, Any]:
 class BaseSkill(ABC, Generic[ParamsT]):
     """所有 skill 的基类。
 
-    子类必须覆盖：name / display_name / description / ACTIONS / execute
+    子类需要覆盖：name / display_name / description / ACTIONS / execute
     可选覆盖：risk_level / action_description
     """
 

@@ -4,7 +4,7 @@
   - 给程序用：Pydantic 自动做类型/范围/必填校验（规划里「程序检查填得对不对」）
   - 给 Qwen 用：model_json_schema() 直接生成 function calling 的 parameters
 
-所以千万不要在这里写「解释型注释」代替校验——写成校验规则，Qwen 和程序都能受益。
+所以不建议在这里写「解释型注释」代替校验——写成校验规则，Qwen 和程序都能受益。
 """
 
 from __future__ import annotations

@@ -2,7 +2,7 @@
 
 这一组测试防的是「我明明写了 skill 怎么没注册」这类问题。
 起因：为了不让三个人共改 skills/__init__.py，注册改成了自动扫描，
-所以扫描逻辑本身必须可靠，否则队友会莫名其妙注册不上。
+所以扫描逻辑本身得可靠，否则容易出现「我写了 skill 怎么没注册上」。
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class TestDiscovery:
         assert skills.get("medication_reminder") is not None
 
     def test_没写SKILL的包被安静跳过(self):
-        """队友的占位文件夹不该导致整个系统起不来。"""
+        """还没写 SKILL 的占位目录不该导致整个系统起不来。"""
         skipped = skills.skipped_packages()
         # 这两个包目前是空占位，应该被跳过而不是报错
         assert "emergency_call" in skipped
@@ -78,7 +78,7 @@ class TestDiscovery:
         assert "实例" in str(e.value)
 
     def test_某个包导入失败时给出可操作的报错(self, tmp_path, monkeypatch):
-        """队友推了语法错误的代码时，别人看到的必须是能照着做的提示。
+        """别人推了语法错误的代码时，其他人看到的必须是能照着做的提示。
 
         背景：自动发现会导入每一个包，所以一个人的语法错误会让所有人的
         import skills 一起挂掉。直接抛原始 SyntaxError 的话，

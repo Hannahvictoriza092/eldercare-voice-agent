@@ -7,8 +7,8 @@
   健康反馈 -> 「上周」「这个月」
 各写一份必然出现「早上 8 点」和「8 点上午」这种不一致，所以统一放这里。
 
-【硬性约定】
-永远不要把 ISO 格式（2026-09-19、08:00:00、PT10M）直接念给老人听。
+【一条约定】
+ISO 格式（2026-09-19、08:00:00、PT10M）直接念给老人听是不合适的。
 """
 
 from __future__ import annotations
@@ -84,7 +84,7 @@ def in_future_cn(minutes: float) -> str:
 
 
 def week_range_cn(day: date | None = None) -> str:
-    """本周一到周日的说法，健康反馈组做周报标题用。"""
+    """本周一到周日的说法，健康和照顾反馈做周报标题用。"""
     day = day or date.today()
     monday = day - timedelta(days=day.weekday())
     sunday = monday + timedelta(days=6)

@@ -9,17 +9,17 @@
 
 ---
 
-## 一、三个人负责什么
+## 一、三个人的分工
 
-| 模块 | 文件夹 | 负责人 | 状态 |
+| 模块 | 文件夹 | 谁在做 | 状态 |
 |---|---|---|---|
-| **用药提醒** | `skills/medication_reminder/` | 我 | ✅ 已完成 |
-| **呼救** | `skills/emergency_call/` | 队友 A | 🚧 待实现 |
-| **健康和照顾反馈** | `skills/health_report/` | 队友 B | 🚧 待实现 |
-| **共享契约层** | `common/` | 三人共同 | ⚠️ 草案待定稿 |
+| **用药提醒** | `skills/medication_reminder/` | （填名字） | ✅ 已完成 |
+| **呼救** | `skills/emergency_call/` | （填名字） | 🚧 待实现 |
+| **健康和照顾反馈** | `skills/health_report/` | （填名字） | 🚧 待实现 |
+| **共享契约层** | `common/` | 三个人一起 | ⚠️ 草案待定稿 |
 
 > 📌 每个 skill 文件夹下都有一份 `README.md`，写清了那个模块要做什么、怎么开工。
-> **先读自己文件夹里的 README。**
+> 动手前可以先看自己那份。
 
 ### 三个模块的依赖关系（重要）
 
@@ -32,8 +32,8 @@ flowchart LR
     H -->|"周报"| F["子女 / 医院"]
 ```
 
-所以**健康反馈组是下游**，它的数据源是另外两组的产出。
-这就是为什么必须有共享层 `common/`。
+所以**健康和照顾反馈在数据上是下游**，它的数据源是另外两个 skill 的产出。
+这就是为什么要有共享层 `common/`。
 
 ### 协作方式：平等，不需要审批
 
@@ -42,7 +42,7 @@ flowchart LR
 | 分支 | **不用建分支，三个人都直接推 `main`** |
 | 冲突 | 自动发现已经消灭了最大的冲突源 |
 | 谁批准 | **不需要任何人批准** |
-| 唯一的纪律 | 开工前 `git pull`，提交前跑 `pytest` |
+| 我们的约定 | 开工前 `git pull`，提交前跑 `pytest` |
 | 注册新 skill | 自己包里写 `SKILL = YourSkill()`，**不用改公共文件** |
 
 详见 `CONTRIBUTING.md`。
@@ -53,22 +53,22 @@ flowchart LR
 
 ```
 .
-├── common/                       # ★ 共享契约层（三人共同维护，改前要打招呼）
+├── common/                       # ★ 共享契约层（三个人一起用，改动前说一声）
 │   ├── base.py                   #   BaseSkill / SkillResult / SkillContext / RiskLevel
 │   ├── registry.py               #   注册表：程序查表、导出 Qwen schema
 │   ├── domain.py                 #   数据实体 Person / MedicationLog / Incident / Notification
 │   └── timefmt.py                #   时间口语化：08:00 → 「早上 8 点」
 │
-├── skills/                       # 各 skill 的私有领地
+├── skills/                       # 各 skill 自己的目录
 │   ├── __init__.py               #   自动发现（★ 谁都不需要改这个文件）
-│   ├── medication_reminder/      #   ← 我负责
-│   ├── emergency_call/           #   ← 队友 A（含 README 说明怎么开工）
-│   └── health_report/            #   ← 队友 B（含 README 说明怎么开工）
+│   ├── medication_reminder/      #   ← 用药提醒
+│   ├── emergency_call/           #   ← 呼救（含 README 说明怎么开工）
+│   └── health_report/            #   ← 健康和照顾反馈（含 README 说明怎么开工）
 │
 ├── tests/                        # 测试
 ├── docs/
-│   ├── 队友上手.md                #   ★ 队友第一次动手就看这份（4 步 10 分钟）
-│   ├── 接口约定.md                #   ★ 三人必须遵守的契约
+│   ├── 上手指南.md                #   ★ 第一次动手看这份（4 步 10 分钟）
+│   ├── 接口约定.md                #   ★ 三个人一起约定的接口
 │   ├── 网络与Git配置.md            #   推送失败时看（国内直连 GitHub 常失败）
 │   └── reference/                #   项目规划截图
 │
@@ -92,7 +92,7 @@ flowchart LR
 ```bash
 pip install -r requirements.txt
 
-python -m pytest        # 跑测试，应该 46 passed
+python -m pytest        # 跑测试，应该 55 passed
 python demo.py          # 看完整链路演示（8 个场景）
 ```
 
@@ -110,23 +110,23 @@ python -c "import skills; print([s.name for s in skills.all_skills()])"   # 看�
 
 ---
 
-## 四、我该从哪开始
+## 四、从哪开始
 
-| 你是谁 | 第一步 |
+| 情况 | 建议先看 |
 |---|---|
-| **队友 A / B（第一次动手）** | 📄 **先读 `docs/队友上手.md`**（4 步 10 分钟，只讲怎么开始） |
-| **队友 A（呼救）** | 然后读 `skills/emergency_call/README.md` |
-| **队友 B（健康反馈）** | 然后读 `skills/health_report/README.md`，⚠️ **先跟队友确认共享事件流怎么读**，那是你的阻塞点 |
-| **所有人** | 写代码前读 `docs/接口约定.md`（三人契约） |
+| **第一次动手** | 📄 `docs/上手指南.md`（4 步 10 分钟，只讲怎么开始） |
+| **写呼救** | 再读 `skills/emergency_call/README.md` |
+| **写健康和照顾反馈** | 再读 `skills/health_report/README.md`，⚠️ 共享事件流怎么读这块建议先和另外两人对上 |
+| **所有人** | 写代码前看 `docs/接口约定.md`（一起约定的接口） |
 
-### 新人上手最快的路径
+### 上手最快的路径
 
 1. 跑一遍 `python demo.py`，理解整条链路
 2. 读 `common/base.py` 的注释，理解一个 skill 长什么样
 3. 打开 `skills/medication_reminder/schema.py`，看参数模型和校验规则怎么写
-4. 复制 `medication_reminder/` 的 5 个文件到自己的文件夹，改造成自己的业务
+4. 复制 `medication_reminder/` 的 5 个文件到自己文件夹，改造成自己的业务
 
-**不要从零开始写**——照着 `medication_reminder` 的结构走，就不会和别人的对不上。
+**从零开始写会比较慢**——照着 `medication_reminder` 的结构走，比较容易和大家对上。
 
 ---
 
@@ -162,7 +162,7 @@ medication_reminder_create / _query / _update / _cancel / _confirm_taken
 - **第二层**：`model_validator` 管跨字段规则
 
 跨字段规则是最容易出错的地方，比如「说一天吃三次，却只给了两个时间点」——
-这类错误必须程序拦住，不能指望 Qwen 自己发现。
+这类错误交给程序拦住比较可靠，指望 Qwen 自己发现不太稳妥。
 
 **校验失败不是报错崩掉，而是转成一句追问话术**回给老人。
 因为老人说的信息本来就常常不全，追问是正常流程，不是异常。
@@ -180,17 +180,17 @@ medication_reminder_create / _query / _update / _cancel / _confirm_taken
 
 ## 六、当前待办
 
-### 🔴 阻塞点（三个人一起定，越早越好）
+### 🔴 需要一起定的事（越早越好）
 
 - [ ] `Person.id` 的规则 —— 现在 `person` 是裸字符串，取值可能是 ID 也可能是姓名，**这是个隐患**
-- [ ] 共享事件流存哪、怎么读 —— **队友 B 的阻塞点**
-- [ ] 把 `CODEOWNERS` 里的 `@your-github-id` 换成真实 GitHub 用户名
+- [ ] 共享事件流存哪、怎么读 —— 健康和照顾反馈会卡在这里
+- [ ] 把 `CODEOWNERS` 里的占位用户名换成真实 GitHub 用户名
 
 ### 🟠 待办
 
 - [ ] `SkillResult` 增加 `confirm_level` / `notifications` 字段
       （现在是藏在 `data` 里的 `require_confirm_back` / `notify_family`，靠约定不靠谱）
-- [ ] 用药提醒的 `taken_log` 改成完整事件流（含漏服记录），否则健康反馈组读不到漏服数据
+- [ ] 用药提醒的 `taken_log` 改成完整事件流（含漏服记录），否则健康和照顾反馈那边读不到漏服数据
 
 ### 🟡 后期
 
@@ -206,7 +206,7 @@ medication_reminder_create / _query / _update / _cancel / _confirm_taken
 
 | 文档 | 什么时候看 |
 |---|---|
-| `docs/队友上手.md` | ⚠️ **队友第一次动手就看这份**（4 步搞定 SSH + clone + 日常流程） |
+| `docs/上手指南.md` | ⚠️ **第一次动手看这份**（4 步搞定 SSH + clone + 日常流程） |
 | `docs/网络与Git配置.md` | 推送失败时看（含报错对照表和自查清单） |
 | `docs/接口约定.md` | 写代码前必看，三人契约 |
 | `CONTRIBUTING.md` | 遇到冲突、想了解提交规范时看 |

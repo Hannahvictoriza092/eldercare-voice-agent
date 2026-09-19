@@ -1,11 +1,11 @@
 """跨 skill 共享的数据实体。
 
 ======================================================================
-★ 这个文件是三个人的【共同财产】，任何人改动都必须经另外两人同意。
-★ 状态：草案。标着 TODO-会议 的地方需要三人开会确认后再定稿。
+★ 这个文件是三个人一起用的，改动前在群里说一声比较稳。
+★ 状态：草案。标着 TODO-会议 的地方，等三个人一起确认后再定稿。
 ======================================================================
 
-【为什么必须有这一层】
+【为什么要有这一层】
 三个 skill 不是平行的，是有依赖的：
 
     用药提醒 ──产出──┐
@@ -13,11 +13,11 @@
     呼救     ──产出──┘        呼救事件        ──> 健康反馈（消费）
                      └──────────────────────────> 通知子女/医院
 
-健康反馈组要「每周记录老人行为」，它的数据源就是另外两组产出的东西。
-如果三个人各自定义自己的数据结构，健康反馈组最后必然读不到数据，
-或者要靠 import 别人的私有 store 来硬读——那是耦合，改一处坏三处。
+健康和照顾反馈要「每周记录老人行为」，数据源就是另外两个 skill 产出的东西。
+如果各自定义自己的数据结构，健康和照顾反馈最后肯定读不到数据，
+或者得 import 其他 skill 的私有 store 来硬读——那是耦合，改一处坏三处。
 
-所以：实体字段名一旦定下，谁都不许私自改。
+所以：实体字段名定下来之后，要改的话先在群里说一声。
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field
 # 一、老人身份
 # ======================================================================
 class Contact(BaseModel):
-    """紧急联系人。呼救组要用，健康反馈组发周报也要用。"""
+    """紧急联系人。呼救要用，健康和照顾反馈发周报也要用。"""
 
     name: str
     phone: str
@@ -45,9 +45,9 @@ class Person(BaseModel):
     """一位老人。
 
     TODO-会议: id 用什么规则？建议统一成字符串 ID（如 elder_01），
-    绝对不要用姓名当 ID——重名和改名都会出问题。
+    不建议用姓名当 ID——重名和改名都会出问题。
     目前用药提醒里的 person 字段是个裸字符串，取值可能是 ID 也可能是姓名，
-    这是个隐患，定稿后要统一改成 person_id。
+    这是个隐患，定稿后建议统一改成 person_id。
     """
 
     id: str
@@ -55,14 +55,14 @@ class Person(BaseModel):
     birth_year: int | None = None
     gender: Literal["male", "female", "unknown"] = "unknown"
 
-    # --- 健康信息：健康反馈组负责维护 ---
+    # --- 健康信息：健康和照顾反馈这边维护 ---
     conditions: list[str] = Field(default_factory=list)      # 基础病
     allergies: list[str] = Field(default_factory=list)       # 过敏史
 
-    # --- 联络信息：呼救组负责维护 ---
+    # --- 联络信息：呼救这边维护 ---
     emergency_contacts: list[Contact] = Field(default_factory=list)
 
-    # --- 设备绑定：Agent 层负责填充 ---
+    # --- 设备绑定：Agent 层填进来 ---
     device_id: str | None = None
     voiceprint_id: str | None = None      # 声纹 ID，没做声纹就留空
 
@@ -89,10 +89,10 @@ class MedicationLog(BaseModel):
     ★ 关键设计：每一「次」都落库一条，不靠实时计算。
 
     为什么要这样：如果漏服是实时算出来的（现在时间 - 计划时间 > 60 分钟），
-    那么健康反馈组想统计「上周漏服 3 次」时就没法从数据里读出来，
+    那么健康和照顾反馈想统计「上周漏服 3 次」时就没法从数据里读出来，
     只能自己重新算一遍，而且「老人当时是不是生病了、故意不吃」这类信息会丢。
 
-    用药提醒组注意：目前 executor.py 里的 taken_log 只记「吃了」，
+    用药提醒这边注意：目前 executor.py 里的 taken_log 只记「吃了」，
     漏服是 get_due_reminders 里实时算的，需要改成往这里落完整记录。
     """
 
@@ -126,7 +126,7 @@ class IncidentType(str, Enum):
 class IncidentStatus(str, Enum):
     """事件状态机。
 
-    ★ 呼救组注意：「救助来了吗」这个功能查的就是这个状态 + status_history，
+    ★ 呼救这边注意：「救助来了吗」这个功能查的就是这个状态 + status_history，
     不需要自己另外造一套进度表。状态推进时往 status_history 追加一条即可。
     """
 
@@ -169,7 +169,7 @@ class Incident(BaseModel):
     def progress_cn(self) -> str:
         """把状态翻译成能念给老人听的一句话。
 
-        TODO-呼救组: 这段是给你打样的，请按实际流程改写，语气要让人安心。
+        TODO-呼救: 这段是打样的，按实际流程改写就好，语气要让人安心。
         """
         latest = self.status_history[-1] if self.status_history else None
         mapping = {
@@ -212,7 +212,7 @@ class Notification(BaseModel):
 
     ★ 约定：skill 只【产出】Notification 对象，不负责真正发送。
     发送、重试、送达确认由出站层统一做。
-    这样呼救组不用关心到底走短信还是微信。
+    这样呼救这边不用关心到底走短信还是微信。
     """
 
     id: str

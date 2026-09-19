@@ -10,7 +10,7 @@
 
 为什么这么设计：手动登记意味着三个人都要改同一个文件（skills/__init__.py），
 每次合并必然冲突。改成自动发现后，那个文件谁都不用动了——
-你只需要在自己的文件夹里定义 SKILL，别人完全不用配合。
+只要在自己文件夹里定义 SKILL 就行，不用别人配合。
 """
 
 from __future__ import annotations
@@ -71,7 +71,7 @@ def discover(package_name: str, package_dir: Path) -> list[str]:
     """扫描包目录，把每个导出了 `SKILL` 的子包注册进来。
 
     约定（写进 docs/接口约定.md 了）：
-        每个 skill 包必须在 __init__.py 里定义模块级变量 SKILL，
+        每个 skill 包需要在 __init__.py 里定义模块级变量 SKILL，
         值是一个 skill 实例。
 
     例：
@@ -79,7 +79,7 @@ def discover(package_name: str, package_dir: Path) -> list[str]:
         from .skill import EmergencyCallSkill
         SKILL = EmergencyCallSkill()
 
-    没有 SKILL 的包会被安静跳过，这样队友还没开工时不会把整个系统搞挂。
+    没有 SKILL 的包会被安静跳过，这样别人还没开工时不会把整个系统搞挂。
 
     ⚠️ 但如果某个包【导入就报错】（语法错误、import 不存在的模块等），
     这里会抛一个说明清楚的异常，指出是哪个包坏了、该找谁。
@@ -105,8 +105,8 @@ def discover(package_name: str, package_dir: Path) -> list[str]:
                 f"   而且因为自动发现要导入每个包，它会让【所有人】都无法运行。\n"
                 f"\n"
                 f"   怎么办：\n"
-                f"     1. 如果这是你自己的模块 -> 修好再提交\n"
-                f"     2. 如果是队友的模块   -> 把这段报错发给他，让他修\n"
+                f"     1. 如果是自己写的那块 -> 修好再提交\n"
+                f"     2. 如果是队友写的那块 -> 把这段报错发给他看看\n"
                 f"     3. 临时绕过（本地调试用）：\n"
                 f"        git stash          或者把该文件夹临时改名\n"
                 f"{'=' * 68}\n"

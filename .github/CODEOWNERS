@@ -7,8 +7,8 @@
 #
 # ⚠️ 把占位符换成真实 GitHub 用户名：
 #      @Hannahvictoriza092  -> 用药提醒
-#      @teammate-a-id        -> 队友 A（呼救）
-#      @teammate-b-id        -> 队友 B（健康和照顾反馈）
+#      @teammate-a-id        -> 呼救
+#      @teammate-b-id        -> 健康和照顾反馈
 #
 # 语法：<路径模式>  <@用户名...>     越靠后的规则优先级越高
 

@@ -11,9 +11,9 @@
 | 分支 | **不用建分支，直接推 `main`** |
 | 谁能合并 | 自己的提交自己推，**不需要任何人批准** |
 | `CODEOWNERS` 是什么 | 只是「这块出问题该找谁」的通讯录，**不强制审批** |
-| 唯一的纪律 | 开工前 `git pull`，提交前跑 `pytest` |
+| 我们的约定 | 开工前 `git pull`，提交前跑 `pytest` |
 
-> 为什么留 CI 这道门？因为它不给你们添麻烦——它只在代码真坏了的时候拦一下。
+> 为什么留 CI 这道门？因为它不给大家添麻烦——它只在代码真坏了的时候拦一下。
 > 代码坏了影响的是整个小组的进度汇报，那时候解释起来更麻烦。
 
 ---
@@ -22,7 +22,7 @@
 
 **结论：三个人都直接推 `main`。**
 
-为什么不用分支？我们评估过，对你们这个规模**不划算**：
+为什么不用分支？试过之后觉得，对我们这个规模**不划算**：
 
 | | 分支 + PR | 直接推 main（我们的选择） |
 |---|---|---|
@@ -30,14 +30,14 @@
 | 防覆盖别人 | PR 机制 | **git 自己就会拦**（见下） |
 | 代价 | 忘合并、重复干活、搞不清在哪个分支 | 几乎没有 |
 
-**git 自带的保护**：如果队友先推了，你的 `push` 会被拒绝：
+**git 自带的保护**：如果有人比你先推了，`push` 会被拒绝：
 
 ```
 ! [rejected]  main -> main (fetch first)
 error: failed to push some refs
 ```
 
-这不是坏了，是 git 在说"别人有新东西，你先拉下来"。照做就行（见第三节）。
+这不是坏了，是 git 在说「有人先推了，先拉下来」。照做就行（见第三节）。
 
 ### 什么时候才需要建分支
 
@@ -81,7 +81,7 @@ git pull
 
 # ② 干活……
 
-# ③ 提交前先自己验证（必须全绿）
+# ③ 提交前先自己跑一遍（全绿再提交）
 python -m pytest
 
 # ④ 提交并推送
@@ -98,7 +98,7 @@ git push
 ! [rejected]  main -> main (fetch first)
 ```
 
-这不是出错，是 git 说"别人先推了新东西，你先拉下来"。照做：
+这不是出错，是 git 在说「有人先推了新东西，先拉下来」。照做：
 
 ```bash
 git pull          # 拉下来并合并
@@ -139,7 +139,7 @@ git push          # 再推一次
 | `test` | 加测试 |
 | `chore` | 杂项（配置、依赖） |
 
-**模块**填你负责的那块，方便一眼看出来是谁改的：
+**模块**填对应的那块，方便一眼看出来是哪块改的：
 
 ```bash
 git commit -m "feat(medication): 支持按需服用的药"
@@ -148,7 +148,7 @@ git commit -m "fix(health_report): 修复周报漏服次数统计错误"
 git commit -m "docs(common): 补充 domain 字段说明"
 ```
 
-> 💡 **不要**写「更新」「修改」「提交」这种没有信息的 message。三个月后你自己看不懂。
+> 💡 尽量别写「更新」「修改」「提交」这种没信息的 message，过段时间自己都看不懂。
 
 ---
 
@@ -157,7 +157,7 @@ git commit -m "docs(common): 补充 domain 字段说明"
 好消息：**最容易冲突的文件已经被消灭了。**
 
 `skills/__init__.py` 原本三个人都要改（加自己那两行注册代码），必冲突。
-现在改成**自动发现**——只要你的包里写了 `SKILL = YourSkill()`，
+现在改成**自动发现**——只要包里写了 `SKILL = YourSkill()`，
 系统自己扫到，谁都不用碰公共文件。
 
 还剩下的冲突点：
@@ -199,27 +199,27 @@ git pull        # 开工前 + push 前，各来一次
 
 ---
 
-## 六、绝对不要做的事
+## 六、几件最好别做的事
 
 | 🚫 | 为什么 |
 |---|---|
 | 提交 `data/` 里的数据文件 | 运行时生成的，已在 `.gitignore` 里 |
 | 提交 `__pycache__`、`.pytest_cache` | 同上 |
-| `git push -f` | 会把别人的提交冲掉，**永远不要用** |
+| `git push -f` | 会把别人的提交冲掉，**别用** |
 | 提交密码、API Key | 推到 GitHub 后**删都删不干净**（历史里还在） |
 | 长期不 pull | 冲突会越积越多，最后变成灾难 |
-| 改完不跑测试就推 | 你坏了，别人 `pull` 下来也一起坏 |
+| 改完不跑测试就推 | 自己那份坏了，别人 `pull` 下来也一起坏 |
 
 ---
 
-## 七、仓库设置（管理员操作一次即可）
+## 七、仓库设置（建仓库时设一次）
 
 GitHub 仓库 → Settings：
 
 | 位置 | 设置 |
 |---|---|
 | General → Default branch | `main` |
-| Collaborators | 把两名队员加成 collaborator |
+| Collaborators | 把另外两人加成 collaborator |
 | General → Features → Wiki | 建议关掉（用 `docs/` 就好，两处文档容易对不上） |
 
 **不需要开任何强制审核。** 原因：
@@ -228,8 +228,8 @@ GitHub 仓库 → Settings：
 2. 我们三个人是平等的，不需要谁给谁背书
 3. CI 已经能自动拦住坏代码，比人可靠
 
-如果你想多一层保障，可以开 **`Require status checks`**（推送前测试必须绿）——
-但这会要求走 PR 流程，和我们"直接推 main"的做法冲突，**建议先不用**。
+如果想多一层保障，可以开 **`Require status checks`**（推送前测试得绿）——
+但这会要求走 PR 流程，和我们「直接推 main」的做法冲突，**建议先不用**。
 等以后要改 `common/` 大接口时再说。
 
 ---
@@ -250,7 +250,7 @@ git push -u origin main
 ```
 
 > ⚠️ 在 GitHub 上新建仓库时**不要勾** "Add a README" / "Add .gitignore"，
-> 否则会和你本地的初始提交冲突。
+> 否则会和本地的初始提交冲突。
 
 ### 推送失败怎么办
 
@@ -263,15 +263,15 @@ ssh -T git@github.com            # 应该显示 "Hi 你的用户名!"
 
 ---
 
-## 十、给两名队友的提醒
+## 九、第一次克隆仓库
 
 ```bash
-git clone https://github.com/Hannahvictoriza092/eldercare-voice-agent.git
+git clone git@github.com:Hannahvictoriza092/eldercare-voice-agent.git
 cd eldercare-voice-agent
 pip install -r requirements.txt
 python -m pytest          # 应该全绿
 python demo.py            # 看看整条链路
 ```
 
-然后读 `skills/你的模块/README.md`。
-**你写代码的位置就在那个文件夹里，不需要改任何公共文件。**
+然后看 `skills/你的模块/README.md`。
+**代码写在那个文件夹里就行，不需要改任何公共文件。**

@@ -1,8 +1,8 @@
 """共享层（三个组共同维护）。
 
 分工边界：
-    common/   共享契约 —— 改这里要三个人同意
-    skills/   各 skill 私有实现 —— 各写各的，别人不碰
+    common/   共享契约 —— 三个人一起用，改动前说一声
+    skills/   各 skill 自己的实现 —— 各写各的，一般不互相插手
 
 推荐直接从这里导入：
     from common import BaseSkill, SkillResult, SkillContext, RiskLevel
