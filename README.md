@@ -39,9 +39,10 @@ flowchart LR
 
 | 事项 | 我们的做法 |
 |---|---|
-| 谁能合并 PR | **自己合自己的**，不需要任何人批准 |
-| `CODEOWNERS` | 只是「这块该找谁」的通讯录，**不强制审批** |
-| 唯一的门槛 | **CI 测试必须通过**（机器把关） |
+| 分支 | **不用建分支，三个人都直接推 `main`** |
+| 冲突 | 自动发现已经消灭了最大的冲突源 |
+| 谁批准 | **不需要任何人批准** |
+| 唯一的纪律 | 开工前 `git pull`，提交前跑 `pytest` |
 | 注册新 skill | 自己包里写 `SKILL = YourSkill()`，**不用改公共文件** |
 
 详见 `CONTRIBUTING.md`。
@@ -66,7 +67,9 @@ flowchart LR
 │
 ├── tests/                        # 测试
 ├── docs/
+│   ├── 队友上手.md                #   ★ 队友第一次动手就看这份（4 步 10 分钟）
 │   ├── 接口约定.md                #   ★ 三人必须遵守的契约
+│   ├── 网络与Git配置.md            #   推送失败时看（国内直连 GitHub 常失败）
 │   └── reference/                #   项目规划截图
 │
 ├── .github/
@@ -111,9 +114,10 @@ python -c "import skills; print([s.name for s in skills.all_skills()])"   # 看�
 
 | 你是谁 | 第一步 |
 |---|---|
-| **队友 A（呼救）** | 读 `skills/emergency_call/README.md` |
-| **队友 B（健康反馈）** | 读 `skills/health_report/README.md`，⚠️ **先跟队友确认共享事件流怎么读**，那是你的阻塞点 |
-| **所有人** | 读 `docs/接口约定.md`（契约）和 `CONTRIBUTING.md`（Git 规范） |
+| **队友 A / B（第一次动手）** | 📄 **先读 `docs/队友上手.md`**（4 步 10 分钟，只讲怎么开始） |
+| **队友 A（呼救）** | 然后读 `skills/emergency_call/README.md` |
+| **队友 B（健康反馈）** | 然后读 `skills/health_report/README.md`，⚠️ **先跟队友确认共享事件流怎么读**，那是你的阻塞点 |
+| **所有人** | 写代码前读 `docs/接口约定.md`（三人契约） |
 
 ### 新人上手最快的路径
 
@@ -202,8 +206,9 @@ medication_reminder_create / _query / _update / _cancel / _confirm_taken
 
 | 文档 | 什么时候看 |
 |---|---|
-| `docs/网络与Git配置.md` | ⚠️ **每个队员第一次 push 之前必看**（国内直连 GitHub 常失败） |
+| `docs/队友上手.md` | ⚠️ **队友第一次动手就看这份**（4 步搞定 SSH + clone + 日常流程） |
+| `docs/网络与Git配置.md` | 推送失败时看（含报错对照表和自查清单） |
 | `docs/接口约定.md` | 写代码前必看，三人契约 |
-| `CONTRIBUTING.md` | 第一次提交代码前，以及遇到冲突时 |
+| `CONTRIBUTING.md` | 遇到冲突、想了解提交规范时看 |
 | `skills/*/README.md` | 开工前看自己那份 |
 | `common/domain.py` 的注释 | 需要老人/事件/通知这些实体时 |

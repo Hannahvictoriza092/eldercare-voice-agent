@@ -80,13 +80,38 @@ def discover(package_name: str, package_dir: Path) -> list[str]:
         SKILL = EmergencyCallSkill()
 
     没有 SKILL 的包会被安静跳过，这样队友还没开工时不会把整个系统搞挂。
+
+    ⚠️ 但如果某个包【导入就报错】（语法错误、import 不存在的模块等），
+    这里会抛一个说明清楚的异常，指出是哪个包坏了、该找谁。
+    原因：自动发现要导入每一个包，所以一个人的语法错误会让所有人的
+    import skills 一起挂掉。如果静默跳过，坏掉的 skill 会"神秘消失"，
+    后面联调时才发现，更难查。所以选择【响亮但清楚】地失败。
     """
     found: list[str] = []
     for info in sorted(pkgutil.iter_modules([str(package_dir)]), key=lambda i: i.name):
         if not info.ispkg or info.name.startswith("_"):
             continue
 
-        module = importlib.import_module(f"{package_name}.{info.name}")
+        try:
+            module = importlib.import_module(f"{package_name}.{info.name}")
+        except Exception as exc:  # noqa: BLE001 - 要重新包装成更好懂的提示
+            raise ImportError(
+                f"\n{'=' * 68}\n"
+                f"❌ 无法导入 skill 包：{package_name}/{info.name}\n"
+                f"\n"
+                f"   原始错误：{type(exc).__name__}: {exc}\n"
+                f"\n"
+                f"   这意味着 skills/{info.name}/ 里有代码写错了，\n"
+                f"   而且因为自动发现要导入每个包，它会让【所有人】都无法运行。\n"
+                f"\n"
+                f"   怎么办：\n"
+                f"     1. 如果这是你自己的模块 -> 修好再提交\n"
+                f"     2. 如果是队友的模块   -> 把这段报错发给他，让他修\n"
+                f"     3. 临时绕过（本地调试用）：\n"
+                f"        git stash          或者把该文件夹临时改名\n"
+                f"{'=' * 68}\n"
+            ) from exc
+
         skill = getattr(module, "SKILL", None)
 
         if skill is None:
@@ -94,8 +119,15 @@ def discover(package_name: str, package_dir: Path) -> list[str]:
             continue
         if not isinstance(skill, BaseSkill):
             raise TypeError(
-                f"{package_name}.{info.name} 的 SKILL 不是 BaseSkill 实例，"
-                f"而是 {type(skill).__name__}"
+                f"\n{'=' * 68}\n"
+                f"❌ {package_name}/{info.name}/__init__.py 里的 SKILL 不是 skill 实例\n"
+                f"\n"
+                f"   现在它是：{type(skill).__name__}\n"
+                f"   正确写法：\n"
+                f"       from .skill import YourSkill\n"
+                f"       SKILL = YourSkill()      # 注意是【实例】，不是类本身\n"
+                f"   常见错误：写成了 SKILL = YourSkill（漏了括号）\n"
+                f"{'=' * 68}\n"
             )
 
         register(skill)

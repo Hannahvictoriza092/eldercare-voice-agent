@@ -1,5 +1,8 @@
 # 呼救 skill（负责人：队友 A）
 
+> 📄 **第一次动手请先看 `docs/队友上手.md`**（4 步搞定环境，10 分钟）。
+> 这份文档讲业务设计，那份讲怎么把代码跑起来。
+
 > 你的代码只写在 `skills/emergency_call/` 这个文件夹里。
 > 不要改 `common/`、不要改 `skills/medication_reminder/`、不要改别人的文件。
 
@@ -103,7 +106,7 @@ from common.domain import Incident, IncidentStatus, IncidentType, Notification
 
 ---
 
-## 七、自测清单（提 PR 前跑一遍）
+## 七、自测清单（提交前跑一遍）
 
 - [ ] `python -m pytest tests/ -q` 全绿（别忘了给自己写测试）
 - [ ] `python -c "import skills; print([s.name for s in skills.all_skills()])"` 能看到 `emergency_call`

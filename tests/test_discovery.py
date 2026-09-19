@@ -73,7 +73,36 @@ class TestDiscovery:
         registry.clear()
         with pytest.raises(TypeError) as e:
             registry.discover("skills", tmp_path)
-        assert "BaseSkill" in str(e.value)
+        # 报错要说清楚「漏了括号」这个最常见的写法错误
+        assert "SKILL" in str(e.value)
+        assert "实例" in str(e.value)
+
+    def test_某个包导入失败时给出可操作的报错(self, tmp_path, monkeypatch):
+        """队友推了语法错误的代码时，别人看到的必须是能照着做的提示。
+
+        背景：自动发现会导入每一个包，所以一个人的语法错误会让所有人的
+        import skills 一起挂掉。直接抛原始 SyntaxError 的话，
+        拿到的人只看到一堆 traceback，不知道该找谁。
+        """
+        def boom(name):
+            raise SyntaxError("invalid syntax")
+
+        monkeypatch.setattr(registry.importlib, "import_module", boom)
+        monkeypatch.setattr(
+            registry.pkgutil,
+            "iter_modules",
+            lambda paths: [types.SimpleNamespace(name="teammate_skill", ispkg=True)],
+        )
+
+        registry.clear()
+        with pytest.raises(ImportError) as e:
+            registry.discover("skills", tmp_path)
+
+        msg = str(e.value)
+        assert "teammate_skill" in msg          # 说清是哪个包
+        assert "SyntaxError" in msg             # 保留原始错误类型
+        assert "队友" in msg                     # 告诉你怎么处理
+        assert "git stash" in msg               # 给一个临时绕过办法
 
 
 class TestRegisterValidation:

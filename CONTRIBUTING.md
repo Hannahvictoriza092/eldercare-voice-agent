@@ -8,33 +8,60 @@
 
 | 事项 | 我们的做法 |
 |---|---|
-| 谁能改代码 | 三个人都能改任何地方（但最好只改自己的模块） |
-| 谁能合并 PR | **自己合自己的**，不需要别人批准 |
+| 分支 | **不用建分支，直接推 `main`** |
+| 谁能合并 | 自己的提交自己推，**不需要任何人批准** |
 | `CODEOWNERS` 是什么 | 只是「这块出问题该找谁」的通讯录，**不强制审批** |
-| 唯一的门槛 | **CI 测试必须通过**（机器把关，不是人把关） |
+| 唯一的纪律 | 开工前 `git pull`，提交前跑 `pytest` |
 
 > 为什么留 CI 这道门？因为它不给你们添麻烦——它只在代码真坏了的时候拦一下。
 > 代码坏了影响的是整个小组的进度汇报，那时候解释起来更麻烦。
 
 ---
 
-## 二、分支模型
+## 二、分支：就用 main，不用建分支
+
+**结论：三个人都直接推 `main`。**
+
+为什么不用分支？我们评估过，对你们这个规模**不划算**：
+
+| | 分支 + PR | 直接推 main（我们的选择） |
+|---|---|---|
+| 防冲突 | 自动发现已经解决了，分支帮不上忙 | — |
+| 防覆盖别人 | PR 机制 | **git 自己就会拦**（见下） |
+| 代价 | 忘合并、重复干活、搞不清在哪个分支 | 几乎没有 |
+
+**git 自带的保护**：如果队友先推了，你的 `push` 会被拒绝：
 
 ```
-main  ←── 只放能跑的代码（CI 自动守着）
- │
- ├── feat/medication-xxx     ← 你（用药提醒）
- ├── feat/emergency-xxx      ← 队友 A（呼救）
- └── feat/report-xxx         ← 队友 B（健康和照顾反馈）
+! [rejected]  main -> main (fetch first)
+error: failed to push some refs
 ```
 
-`main` 受保护，但**不是因为有人要审核你**，而是为了：
+这不是坏了，是 git 在说"别人有新东西，你先拉下来"。照做就行（见第三节）。
 
-- ✅ 只接受 PR 合入（让 CI 先跑一遍）
-- ✅ CI 必须绿
-- ❌ **不需要任何人的批准** ← 关键
+### 什么时候才需要建分支
 
-自己开的 PR 自己点「Squash and merge」，全程不用等谁。
+只有这三种情况值得开临时分支：
+
+| 情况 | 例子 |
+|---|---|
+| 大重构，可能要几天 | 「把存储层从 JSON 换成 SQLite」 |
+| 实验性尝试 | 「试试用另一个模型提示词，不行就回退」 |
+| 要改 `common/` 的公共接口 | 「给 SkillResult 加字段」 |
+
+其余情况（写自己的 skill、修 bug、改文档）**直接推 main**。
+
+需要开的时候：
+
+```bash
+git checkout -b feat/你的功能名
+# ...干活、提交...
+git push -u origin feat/你的功能名
+```
+
+干完了就合回 main（在 GitHub 上开 PR 自己合，或者本地 `git checkout main && git merge feat/你的功能名`）。
+
+> ⚠️ 分支别留太久。超过两三天没合，就容易和别人分叉太远，合并时会很痛。
 
 ### 分支命名
 
@@ -46,32 +73,46 @@ main  ←── 只放能跑的代码（CI 自动守着）
 
 ---
 
-## 三、日常流程（每天照做就行）
+## 三、日常流程（就这三步，照做就行）
 
 ```bash
-# 1. 开工前先同步（每天至少一次）
-git checkout main
+# ① 开工前先拉最新的（最重要的一步！）
 git pull
-git checkout -b feat/你的新功能    # 新功能就建新分支
 
-# 2. 干活
+# ② 干活……
 
-# 3. 本地先自己验证（必须全绿再提交）
+# ③ 提交前先自己验证（必须全绿）
 python -m pytest
 
-# 4. 提交
+# ④ 提交并推送
 git add -A
 git commit -m "feat(emergency): 实现发起呼救"
-
-# 5. 推送
-git push -u origin feat/emergency-trigger
+git push
 ```
 
-然后去 GitHub 点 **Compare & pull request** → 等 CI 变绿 → **自己点 Squash and merge**。
+**就这四行，记住 `git pull` 在最前面。**
 
-### 卡在 CI 上了怎么办
+### push 被拒绝了怎么办
 
-看 Actions 页面的红色 ✗，点进去看哪一步失败。常见原因：
+```
+! [rejected]  main -> main (fetch first)
+```
+
+这不是出错，是 git 说"别人先推了新东西，你先拉下来"。照做：
+
+```bash
+git pull          # 拉下来并合并
+git push          # 再推一次
+```
+
+如果 `git pull` 时说有冲突（`CONFLICT`），看第五节的「冲突怎么办」。
+
+> 💡 **养成习惯**：每次 `git push` 之前先 `git pull`，能避免 90% 的麻烦。
+
+### CI 红了怎么办
+
+推送后 CI 会自动跑（看仓库页面的 **Actions** 标签，或你的邮箱）。
+红了的话点进去看哪一步失败，常见原因：
 
 | CI 报错 | 原因 |
 |---|---|
@@ -79,7 +120,7 @@ git push -u origin feat/emergency-trigger
 | 缺少 description | 新增的参数字段没写 `description`，Qwen 会瞎填 |
 | schema 导出失败 | 参数模型写错了（比如字段名和类型名撞车） |
 
-**自己修就行，不用等别人。**
+**自己修，改完再推一次就行，不用等别人。**
 
 ---
 
@@ -150,11 +191,10 @@ location: str | None = None
 
 ### 怎么减少冲突
 
+**记住一句话就行：每次开工前 `git pull`。**
+
 ```bash
-git checkout main
-git pull                    # 每天至少一次
-git checkout 你的分支
-git rebase main             # 把别人的改动接到自己分支下面
+git pull        # 开工前 + push 前，各来一次
 ```
 
 ---
@@ -165,58 +205,36 @@ git rebase main             # 把别人的改动接到自己分支下面
 |---|---|
 | 提交 `data/` 里的数据文件 | 运行时生成的，已在 `.gitignore` 里 |
 | 提交 `__pycache__`、`.pytest_cache` | 同上 |
-| `git push -f` 推 main | 会把别人的提交冲掉 |
+| `git push -f` | 会把别人的提交冲掉，**永远不要用** |
 | 提交密码、API Key | 推到 GitHub 后**删都删不干净**（历史里还在） |
 | 长期不 pull | 冲突会越积越多，最后变成灾难 |
+| 改完不跑测试就推 | 你坏了，别人 `pull` 下来也一起坏 |
 
 ---
 
-## 七、要不要开「强制审核」？——不要
-
-GitHub 有个设置叫 `Require review from Code Owners`。**不建议开**，原因：
-
-1. **GitHub 禁止自己批准自己的 PR**。三个人各管各的模块，谁提交谁就得等别人来看，
-   而别人未必懂你那块 → 最后变成走形式的乱点「Approve」。
-2. 我们本来就平等，不需要谁给谁背书。
-3. CI 比人可靠：人会走神，测试不会。
-
-只开 **`Require status checks`**（CI 必须绿）就够了。
-
----
-
-## 八、仓库设置（管理员操作一次即可）
+## 七、仓库设置（管理员操作一次即可）
 
 GitHub 仓库 → Settings：
 
 | 位置 | 设置 |
 |---|---|
 | General → Default branch | `main` |
-| Branches → Add branch protection rule | 见下表 |
 | Collaborators | 把两名队员加成 collaborator |
 | General → Features → Wiki | 建议关掉（用 `docs/` 就好，两处文档容易对不上） |
 
-### Branch protection rule 怎么勾
+**不需要开任何强制审核。** 原因：
 
-```
-Branch name pattern: main
+1. GitHub 禁止自己批准自己的 PR，开了就变成互相盖章走形式
+2. 我们三个人是平等的，不需要谁给谁背书
+3. CI 已经能自动拦住坏代码，比人可靠
 
-✅ Require a pull request before merging
-   └─ Require approvals: 0                        ← ★ 关键：不要求任何人批准
-   └─ ❌ Require review from Code Owners           ← 一定不要勾
-
-✅ Require status checks to pass before merging
-   └─ 选上 CI / 跑测试
-
-❌ Allow force pushes        ← 关掉
-❌ Allow deletions           ← 关掉
-```
-
-`Require approvals: 0` + `Require status checks` 的组合效果：
-**谁都能自己合自己的 PR，但必须测试通过。**
+如果你想多一层保障，可以开 **`Require status checks`**（推送前测试必须绿）——
+但这会要求走 PR 流程，和我们"直接推 main"的做法冲突，**建议先不用**。
+等以后要改 `common/` 大接口时再说。
 
 ---
 
-## 九、第一次推送
+## 八、第一次推送
 
 > ⚠️ **在国内直连 GitHub 常常失败**（`Connection was reset` 之类）。
 > 遇到问题先看 **`docs/网络与Git配置.md`**，里面有针对本项目的排查过程，
