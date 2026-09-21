@@ -184,13 +184,17 @@ medication_reminder_create / _query / _update / _cancel / _confirm_taken
 
 - [ ] `Person.id` 的规则 —— 现在 `person` 是裸字符串，取值可能是 ID 也可能是姓名，**这是个隐患**
 - [ ] 共享事件流存哪、怎么读 —— 健康和照顾反馈会卡在这里
+      （用药提醒侧已备好数据：`taken_log` 现在含 `taken` / `missed` / `skipped` 三种状态）
 - [ ] 把 `CODEOWNERS` 里的占位用户名换成真实 GitHub 用户名
 
 ### 🟠 待办
 
 - [ ] `SkillResult` 增加 `confirm_level` / `notifications` 字段
       （现在是藏在 `data` 里的 `require_confirm_back` / `notify_family`，靠约定不靠谱）
-- [ ] 用药提醒的 `taken_log` 改成完整事件流（含漏服记录），否则健康和照顾反馈那边读不到漏服数据
+- [x] 用药提醒的 `taken_log` 改成完整事件流（含漏服记录）—— 已完成，
+      漏服在超过 60 分钟时由调度器落库（`MISSED_AFTER_MIN`）
+- [ ] `taken_log` 仍是 `Reminder` 的嵌套字段，没有独立的事件流存储。
+      健康和照顾反馈要跨药查询时会比较别扭，接数据库时建议抽成独立表
 
 ### 🟡 后期
 

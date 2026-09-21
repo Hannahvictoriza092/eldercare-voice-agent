@@ -95,6 +95,8 @@ REMIND = "{person}，该吃{medicine}啦，{dosage}，{timing}。吃完跟我说
 REMIND_NO_NAME = "该吃{medicine}啦，{dosage}，{timing}。吃完跟我说一声「吃了」。"
 REMIND_AGAIN = "{person}，再提醒一次，{medicine}还没吃呢，{dosage}。"
 REMIND_AGAIN_NO_NAME = "再提醒一次，{medicine}还没吃呢，{dosage}。"
+# ★ 这句是发给【子女】的，不是念给老人的，所以用「麻烦您」。
+# 调度器把它放进 notify_text 字段，别塞进 speech。
 REMIND_ESCALATE = "{person}刚才的药一直没吃，麻烦您提醒一下。"
 
 # ----------------------------------------------------------------------

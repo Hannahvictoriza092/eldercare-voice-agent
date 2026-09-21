@@ -22,13 +22,12 @@ from .schema import (
 from .store import Reminder, ReminderStore
 
 SKILL_NAME = "medication_reminder"
-# 老人说「早上八点」时，允许前后多久内算「就是这一次」
-SLOT_TOLERANCE_MIN = 90
 
-
-def _slot_to_time(slot: str) -> time:
-    h, m = slot.split(":")
-    return time(int(h), int(m))
+# 调度器每分钟跑一次，计划时间前后这么久之内算「就是这一次」，该播提醒了。
+DUE_TOLERANCE_MIN = 5
+# 超过计划时间这么久还没确认，就判定为漏服：落库一条 missed 记录，并升级通知子女。
+# ★ 这个数字决定「多久算漏服」，健康和照顾反馈统计漏服次数用的就是落库结果。
+MISSED_AFTER_MIN = 60
 
 
 class MedicationExecutor:
@@ -191,6 +190,11 @@ class MedicationExecutor:
         )
 
     def _history(self, person: str, medicine_name: str | None = None) -> list[dict[str, Any]]:
+        """最近的服药记录，含「漏服」「跳过」。
+
+        status 字段是给上层（日志/前端/健康和照顾反馈）看的，
+        念给老人的话术里不出现它。
+        """
         out: list[dict[str, Any]] = []
         for r in self.store.query(person=person, medicine_name=medicine_name, active=None):
             for log in r.taken_log:
@@ -376,11 +380,18 @@ class MedicationExecutor:
     # 调度器接口（不属于 Qwen 的 action，由后台定时任务调用）
     # ==================================================================
     def get_due_reminders(self, now: datetime | None = None,
-                          tolerance_min: int = 5) -> list[dict[str, Any]]:
-        """取出「现在该提醒」的记录列表。
+                          tolerance_min: int = DUE_TOLERANCE_MIN) -> list[dict[str, Any]]:
+        """取出「现在该提醒」和「已经漏服」的记录列表。
 
-        给定时调度器用：每分钟跑一次，拿到结果就播报，播完在 speaking 表里标记，
-        避免同一时间点反复播。这里只负责算，不负责播和去重。
+        给定时调度器用：每分钟跑一次。这里只负责算，不负责播和去重
+        （播报去重由调度器自己维护，本函数是幂等的）。
+
+        返回两类记录，靠 escalate 字段区分：
+          1. 该提醒了：{"speech": ..., "slot": ...}           -> 播报
+          2. 已漏服：  {"escalate": True, "overdue_minutes": ...} -> 通知子女
+
+        ★ 第 2 类会顺手往事件流里落一条 missed 记录（只落一次），
+        这样健康和照顾反馈那边才能统计「本周漏服几次、哪几种药」。
         """
         now = now or datetime.now()
         now_minutes = now.hour * 60 + now.minute
@@ -409,25 +420,39 @@ class MedicationExecutor:
                         }
                     )
 
-        # 超时未服用的：提醒过 N 次还没确认，可以升级通知子女
+        # 超时未服用的：判定漏服，落库 + 升级通知子女
         for r in self.store.all():
             if not r.is_effective_on(now.date()):
                 continue
             taken = r.taken_slots(now.date())
+            logged = r.logged_slots(now.date())
             for slot in r.times:
                 if slot in taken:
                     continue
                 overdue = now_minutes - _time_to_min(slot)
-                if overdue > 60:
-                    due.append(
-                        {
-                            "reminder_id": r.id,
-                            "person": r.person,
-                            "slot": slot,
-                            "overdue_minutes": overdue,
-                            "escalate": True,
-                        }
-                    )
+                if overdue <= MISSED_AFTER_MIN:
+                    continue
+                # 已经判定过就不再重复写、重复通知。
+                # 注意只查 logged（含 missed/skipped），因为「刚判定」和「已判定」
+                # 要区分开：前者发通知，后者只是每次轮询都会再算出来。
+                newly_missed = slot not in logged and self.store.log_missed(
+                    r.id, now.date(), slot, overdue_minutes=overdue, at=now
+                )
+                due.append(
+                    {
+                        "reminder_id": r.id,
+                        "person": r.person,
+                        "medicine_name": r.medicine_name,
+                        "slot": slot,
+                        "overdue_minutes": overdue,
+                        "escalate": True,
+                        # 调度器据此决定要不要通知家属，避免每分钟重复通知
+                        "newly_missed": newly_missed,
+                        # ★ 注意这里是 notify_text 不是 speech：
+                        # 这句话是发给子女的，不能念给老人听。
+                        "notify_text": msg.render(msg.REMIND_ESCALATE, person=r.person),
+                    }
+                )
         return due
 
 

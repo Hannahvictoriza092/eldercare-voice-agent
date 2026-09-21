@@ -31,6 +31,12 @@ NOW = datetime(2026, 9, 19, 8, 0, 0)
 CTX = SkillContext(speaker_id="elder_01", speaker_name="张奶奶", now=NOW)
 
 
+def datetime_ctx(y: int, m: int, d: int, hh: int = 0, mm: int = 0) -> SkillContext:
+    """造一个指定「现在」的上下文。"""
+    return SkillContext(speaker_id="elder_01", speaker_name="张奶奶",
+                        now=datetime(y, m, d, hh, mm))
+
+
 @pytest.fixture()
 def skill(tmp_path) -> MedicationReminderSkill:
     store = ReminderStore(tmp_path / "reminders.json")
@@ -328,6 +334,168 @@ class TestDueReminders:
         late = datetime(2026, 9, 19, 10, 0)
         escalations = [d for d in skill.due_reminders(late) if d.get("escalate")]
         assert escalations and escalations[0]["overdue_minutes"] == 120
+
+    def test_没到阈值不算漏服(self, skill):
+        """50 分钟不算漏服，边界要卡在 60。"""
+        create_sample(skill)
+        soon = datetime(2026, 9, 19, 8, 50)
+        assert [d for d in skill.due_reminders(soon) if d.get("escalate")] == []
+
+    def test_漏服会落库(self, skill):
+        """★ 核心：漏服必须写进事件流，否则健康和照顾反馈统计不到。"""
+        create_sample(skill)
+        rid = skill.executor.store.query(person="elder_01")[0].id
+        skill.due_reminders(datetime(2026, 9, 19, 10, 0))
+
+        log = skill.executor.store.get(rid).taken_log
+        assert len(log) == 1
+        assert log[0]["status"] == "missed"
+        assert log[0]["slot"] == "08:00"
+        assert log[0]["overdue_minutes"] == 120
+        assert log[0]["source"] == "system"
+
+    def test_漏服不重复落库(self, skill):
+        """调度器每分钟跑一次，不能每分钟写一条。"""
+        create_sample(skill)
+        rid = skill.executor.store.query(person="elder_01")[0].id
+        for minute in (0, 1, 2, 3):
+            skill.due_reminders(datetime(2026, 9, 19, 10, minute))
+
+        assert len(skill.executor.store.get(rid).taken_log) == 1
+
+    def test_只有首次判定才标记newly_missed(self, skill):
+        """调度器靠这个字段决定要不要通知家属，不能每轮都通知。"""
+        create_sample(skill)
+        first = [d for d in skill.due_reminders(datetime(2026, 9, 19, 10, 0))
+                 if d.get("escalate")]
+        second = [d for d in skill.due_reminders(datetime(2026, 9, 19, 10, 5))
+                  if d.get("escalate")]
+        assert first[0]["newly_missed"] is True
+        assert second[0]["newly_missed"] is False
+
+    def test_漏服后仍会继续提醒(self, skill):
+        """漏服不该被当成「已处理」，老人后来吃了也得能补上。
+
+        这是 taken_slots 只认 taken 的原因：如果漏服也算「已服用」，
+        老人这一顿就永远不会再被提醒了。
+        """
+        create_sample(skill, frequency="twice_daily", times=["08:00", "20:00"])
+        skill.due_reminders(datetime(2026, 9, 19, 10, 0))
+
+        # 早上那次已判漏服，晚上那次仍应正常提醒
+        evening = [d for d in skill.due_reminders(datetime(2026, 9, 19, 20, 0))
+                   if not d.get("escalate")]
+        assert len(evening) == 1 and evening[0]["slot"] == "20:00"
+
+    def test_漏服后补报以老人说的为准(self, skill):
+        """老人被通知后说「我吃了」，记录应该改成 taken，而不是两条并存。"""
+        create_sample(skill)
+        rid = skill.executor.store.query(person="elder_01")[0].id
+        skill.due_reminders(datetime(2026, 9, 19, 10, 0))
+        skill.run("confirm_taken", {}, datetime_ctx(2026, 9, 19, 10, 30))
+
+        log = skill.executor.store.get(rid).taken_log
+        assert len(log) == 1
+        assert log[0]["status"] == "taken"
+
+    def test_漏服记录出现在历史里(self, skill):
+        create_sample(skill)
+        skill.due_reminders(datetime(2026, 9, 19, 10, 0))
+        history = skill.run("query", {"include_history": True}, CTX).data["history"]
+        assert history and history[0]["status"] == "missed"
+
+    def test_升级通知是发给子女的不是念给老人的(self, skill):
+        """REMIND_ESCALATE 里是「麻烦您提醒一下」，念给老人听不通。"""
+        create_sample(skill)
+        escalations = [d for d in skill.due_reminders(datetime(2026, 9, 19, 10, 0))
+                       if d.get("escalate")]
+        assert "speech" not in escalations[0]
+        assert "麻烦您" in escalations[0]["notify_text"]
+
+
+# ======================================================================
+# 3.5 服药记录的存储层
+# ======================================================================
+class TestTakenLogStore:
+    """taken_log 的读写规则。这层是健康和照顾反馈的数据来源，要稳。"""
+
+    @pytest.fixture()
+    def store(self, tmp_path):
+        from skills.medication_reminder.store import Reminder, ReminderStore
+
+        s = ReminderStore(tmp_path / "reminders.json")
+        s.add(Reminder(
+            id="med_1", person="elder_01", medicine_name="阿司匹林",
+            dosage=1, dosage_unit="tablet", frequency="once_daily",
+            times=["08:00"], start_date="2026-09-19",
+        ))
+        return s
+
+    def test_旧数据没有status字段时当作已服用(self, store):
+        """兼容升级前的文件：老记录只有 taken_at，不能被误判成漏服。"""
+        r = store.get("med_1")
+        r.taken_log.append(
+            {"date": "2026-09-19", "slot": "08:00",
+             "taken_at": "2026-09-19T08:03:00", "source": "voice"}
+        )
+        store.update(r)
+
+        assert store.get("med_1").taken_slots(date(2026, 9, 19)) == {"08:00"}
+        assert store.get("med_1").missed_slots(date(2026, 9, 19)) == set()
+
+    def test_漏服不算已服用(self, store):
+        store.log_missed("med_1", date(2026, 9, 19), "08:00", overdue_minutes=90)
+        r = store.get("med_1")
+        assert r.taken_slots(date(2026, 9, 19)) == set()
+        assert r.missed_slots(date(2026, 9, 19)) == {"08:00"}
+
+    def test_logged_slots包含漏服(self, store):
+        """调度器靠它判断「是否已判定过」，所以漏服也要算进去。"""
+        store.log_missed("med_1", date(2026, 9, 19), "08:00")
+        assert store.get("med_1").logged_slots(date(2026, 9, 19)) == {"08:00"}
+
+    def test_补报覆盖漏服(self, store):
+        store.log_missed("med_1", date(2026, 9, 19), "08:00")
+        store.log_taken("med_1", date(2026, 9, 19), "08:00",
+                        taken_at=datetime(2026, 9, 19, 10, 30))
+        log = store.get("med_1").taken_log
+        assert len(log) == 1
+        assert log[0]["status"] == "taken"
+
+    def test_已服用不会被漏服覆盖(self, store):
+        """吃过就是吃过：调度器算错了也不能把 taken 改回 missed。"""
+        store.log_taken("med_1", date(2026, 9, 19), "08:00")
+        store.log_missed("med_1", date(2026, 9, 19), "08:00", overdue_minutes=120)
+        log = store.get("med_1").taken_log
+        assert len(log) == 1
+        assert log[0]["status"] == "taken"
+
+    def test_重复记服用不追加(self, store):
+        store.log_taken("med_1", date(2026, 9, 19), "08:00")
+        store.log_taken("med_1", date(2026, 9, 19), "08:00")
+        assert len(store.get("med_1").taken_log) == 1
+
+    def test_记不存在的提醒返回False(self, store):
+        assert store.log_taken("不存在", date(2026, 9, 19), "08:00") is False
+
+    def test_跨天不互相影响(self, store):
+        store.log_missed("med_1", date(2026, 9, 19), "08:00")
+        assert store.get("med_1").missed_slots(date(2026, 9, 20)) == set()
+
+    def test_落盘后能重新读出来(self, tmp_path):
+        from skills.medication_reminder.store import Reminder, ReminderStore
+
+        path = tmp_path / "reminders.json"
+        s1 = ReminderStore(path)
+        s1.add(Reminder(
+            id="med_1", person="elder_01", medicine_name="阿司匹林",
+            dosage=1, dosage_unit="tablet", frequency="once_daily",
+            times=["08:00"], start_date="2026-09-19",
+        ))
+        s1.log_missed("med_1", date(2026, 9, 19), "08:00", overdue_minutes=90)
+
+        s2 = ReminderStore(path)
+        assert s2.get("med_1").missed_slots(date(2026, 9, 19)) == {"08:00"}
 
 
 # ======================================================================

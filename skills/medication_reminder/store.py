@@ -16,6 +16,21 @@ from typing import Any
 
 DEFAULT_PATH = Path("data/reminders.json")
 
+# 服药记录的状态。对齐 common/domain.py 的 MedicationStatus，
+# 这样健康和照顾反馈那边统计依从率时，口径和这里是一致的。
+STATUS_TAKEN = "taken"        # 已服用
+STATUS_MISSED = "missed"      # 到点没吃（系统判定，超过阈值）
+STATUS_SKIPPED = "skipped"    # 老人主动说跳过
+
+
+def _status_of(log: dict[str, Any]) -> str:
+    """取一条记录的 status。
+
+    老数据里没有 status 字段（那时只记「吃了」），一律当作 taken，
+    这样升级后读旧文件不会把历史服药记录当成漏服。
+    """
+    return log.get("status") or STATUS_TAKEN
+
 
 @dataclass
 class Reminder:
@@ -37,9 +52,14 @@ class Reminder:
     created_at: str = ""                 # ISO 时间戳
     cancelled_at: str | None = None
     cancel_reason: str | None = None
+    # 服药记录：每次服药落一条，含「没吃」的情况。
+    # ★ 为什么不只记「吃了」：健康和照顾反馈要统计「本周漏服 3 次」，
+    #   如果漏服是实时算出来的、不落库，那边就读不到历史，只能自己重算一遍。
+    # 单条结构：
+    # {"date": "2026-09-19", "slot": "08:00", "status": "taken",
+    #  "at": "2026-09-19T08:03:00", "source": "voice", "overdue_minutes": None}
+    # 兼容旧数据：没有 status 字段的记录一律当作 taken（见 _status_of）。
     taken_log: list[dict[str, Any]] = field(default_factory=list)
-    # taken_log 的单条结构：
-    # {"date": "2026-09-19", "slot": "08:00", "taken_at": "2026-09-19T08:03:00", "source": "voice"}
 
     # ---- 便利方法 ----
     def start(self) -> date:
@@ -66,9 +86,34 @@ class Reminder:
         return True
 
     def taken_slots(self, day: date) -> set[str]:
-        """某天已经确认服用的时间点集合。"""
+        """某天已经确认服用的时间点集合。
+
+        只有 status=taken 才算「已服用」；漏服/跳过不在这里，
+        否则漏服之后就会被当成「吃过了」，再也不提醒。
+        """
+        d = day.isoformat()
+        return {
+            log["slot"]
+            for log in self.taken_log
+            if log.get("date") == d and _status_of(log) == STATUS_TAKEN
+        }
+
+    def logged_slots(self, day: date) -> set[str]:
+        """某天已经有记录的时间点（不论吃了、漏了还是跳过）。
+
+        调度器用这个来判断「这次是否已经判定过漏服」，避免每分钟重复写。
+        """
         d = day.isoformat()
         return {log["slot"] for log in self.taken_log if log.get("date") == d}
+
+    def missed_slots(self, day: date) -> set[str]:
+        """某天判定为漏服的时间点。健康和照顾反馈统计漏服次数用。"""
+        d = day.isoformat()
+        return {
+            log["slot"]
+            for log in self.taken_log
+            if log.get("date") == d and _status_of(log) == STATUS_MISSED
+        }
 
 
 class ReminderStore:
@@ -158,22 +203,77 @@ class ReminderStore:
             return True
         return False
 
-    def log_taken(self, reminder_id: str, day: date, slot: str,
-                  taken_at: datetime | None = None, source: str = "voice") -> bool:
-        """记一笔服药。同一天同一时间点只记一次，重复上报不报错。"""
+    # ---------------- 服药记录 ----------------
+    def _append_log(self, reminder_id: str, day: date, slot: str, status: str,
+                    at: datetime | None = None, source: str = "voice",
+                    overdue_minutes: int | None = None) -> bool:
+        """往某条提醒里追加一条记录。同一时间点已经记过就不重复写。
+
+        返回 True 表示这次真的写进去了（False = 已有记录，跳过）。
+        调用方靠这个返回值判断「是不是刚判定漏服」，避免每分钟重复通知。
+
+        唯一会「改写已有记录」的情况：原来记的是漏服/跳过，
+        现在老人补报「我吃了」——以老人的说法为准，把那条改成 taken。
+        反过来（已记 taken 又判漏服）不会覆盖：吃过就是吃过。
+        """
         r = self.get(reminder_id)
         if r is None:
             return False
         d = day.isoformat()
-        if any(log["date"] == d and log["slot"] == slot for log in r.taken_log):
-            return True
+
+        for log in r.taken_log:
+            if log["date"] != d or log["slot"] != slot:
+                continue
+            if _status_of(log) == status:
+                return False
+            if _status_of(log) in (STATUS_MISSED, STATUS_SKIPPED) and status == STATUS_TAKEN:
+                log["status"] = status
+                log["at"] = (at or datetime.now()).isoformat(timespec="seconds")
+                log["source"] = source
+                self.update(r)
+                return True
+            return False
+
         r.taken_log.append(
             {
                 "date": d,
                 "slot": slot,
-                "taken_at": (taken_at or datetime.now()).isoformat(timespec="seconds"),
+                "status": status,
+                "at": (at or datetime.now()).isoformat(timespec="seconds"),
                 "source": source,
+                "overdue_minutes": overdue_minutes,
             }
         )
         self.update(r)
         return True
+
+    def log_taken(self, reminder_id: str, day: date, slot: str,
+                  taken_at: datetime | None = None, source: str = "voice") -> bool:
+        """记一笔服药。同一天同一时间点只记一次，重复上报不报错。
+
+        如果这个时间点之前被判过漏服，这里会把那条记录改成「已服用」——
+        老人事后补一句「我吃了」，应该以他说的为准。
+        """
+        return self._append_log(reminder_id, day, slot, STATUS_TAKEN,
+                                at=taken_at, source=source)
+
+    def log_missed(self, reminder_id: str, day: date, slot: str,
+                   overdue_minutes: int | None = None,
+                   at: datetime | None = None) -> bool:
+        """记一笔漏服。
+
+        ★ 谁调用：后台调度器在「超过阈值还没确认」时调用。
+        为什么必须落库：漏服如果只是实时算出来的，健康和照顾反馈统计
+        「本周漏服 3 次」时就无据可查，也没法区分「老人当时是不是故意不吃」。
+
+        返回 True 表示这是【刚判定】的漏服，调用方可以据此发通知；
+        False 表示之前已经记过（或老人已经吃过），不要重复通知。
+        """
+        return self._append_log(reminder_id, day, slot, STATUS_MISSED,
+                                at=at, source="system",
+                                overdue_minutes=overdue_minutes)
+
+    def log_skipped(self, reminder_id: str, day: date, slot: str) -> bool:
+        """记一笔「老人主动说这次不吃」。和漏服分开统计，性质不一样。"""
+        return self._append_log(reminder_id, day, slot, STATUS_SKIPPED,
+                                source="voice")

@@ -92,8 +92,11 @@ class MedicationLog(BaseModel):
     那么健康和照顾反馈想统计「上周漏服 3 次」时就没法从数据里读出来，
     只能自己重新算一遍，而且「老人当时是不是生病了、故意不吃」这类信息会丢。
 
-    用药提醒这边注意：目前 executor.py 里的 taken_log 只记「吃了」，
-    漏服是 get_due_reminders 里实时算的，需要改成往这里落完整记录。
+    ✅ 已完成：用药提醒的 executor.get_due_reminders() 在超过 60 分钟
+    （MISSED_AFTER_MIN）时会往 store 的 taken_log 里落一条 status=missed 的记录，
+    并带 overdue_minutes。老人事后补报「我吃了」会把那条改成 taken。
+    ⚠️ 待办：taken_log 目前是 Reminder 的嵌套字段，还没有独立的共享事件流存储，
+    健康和照顾反馈要读的话仍需先和用药提醒这边定好读取方式。
     """
 
     id: str
