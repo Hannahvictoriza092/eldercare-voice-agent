@@ -7,22 +7,22 @@
 #
 # ⚠️ 把占位符换成真实 GitHub 用户名：
 #      @Hannahvictoriza092  -> 用药提醒
-#      @teammate-a-id        -> 呼救
-#      @teammate-b-id        -> 健康和照顾反馈
+#      @tjame235-ux        -> 呼救
+#      @siyu-huo        -> 健康和照顾反馈
 #
 # 语法：<路径模式>  <@用户名...>     越靠后的规则优先级越高
 
 # ---- 共享契约层：改动会影响所有人，建议在群里说一声 ----
-/common/                @Hannahvictoriza092 @teammate-a-id @teammate-b-id
+/common/                @Hannahvictoriza092 @tjame235-ux @siyu-huo
 
 # ---- 各人的模块：自己负责 ----
 /skills/medication_reminder/    @Hannahvictoriza092
-/skills/emergency_call/         @teammate-a-id
-/skills/health_report/          @teammate-b-id
+/skills/emergency_call/         @tjame235-ux
+/skills/health_report/          @siyu-huo
 
 # ---- 公共设施 ----
 /.github/               @Hannahvictoriza092
-/docs/                  @Hannahvictoriza092 @teammate-a-id @teammate-b-id
+/docs/                  @Hannahvictoriza092 @tjame235-ux @siyu-huo
 
 # 注意：skills/__init__.py 不在上面任何一条里，
 # 因为它已经改成自动发现，谁都不需要再动它了。
