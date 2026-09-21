@@ -42,12 +42,14 @@ class TestDiscovery:
     def test_没写SKILL的包被安静跳过(self):
         """还没写 SKILL 的占位目录不该导致整个系统起不来。"""
         skipped = skills.skipped_packages()
-        # 这两个包目前是空占位，应该被跳过而不是报错
+        # emergency_call 目前是空占位，应该被跳过而不是报错
         assert "emergency_call" in skipped
-        assert "health_report" in skipped
+        # health_report 已实现并注册，不应再被跳过
+        assert "health_report" not in skipped
 
     def test_跳过不影响已注册的skill(self):
         assert "medication_reminder" not in skills.skipped_packages()
+        assert "health_report" not in skills.skipped_packages()
 
     def test_重新扫描结果一致(self):
         """discover 应该幂等：清空再扫，还是同一个结果。"""
@@ -55,8 +57,11 @@ class TestDiscovery:
         assert skills.all_skills() == []
 
         found = registry.discover("skills", Path(skills.__file__).parent)
-        assert found == ["medication_reminder"]
-        assert [s.name for s in skills.all_skills()] == ["medication_reminder"]
+        assert set(found) == {"medication_reminder", "health_report"}
+        assert set(s.name for s in skills.all_skills()) == {
+            "medication_reminder",
+            "health_report",
+        }
 
     def test_导出了非BaseSkill的SKILL会报错(self, tmp_path, monkeypatch):
         """写错入口时要给清楚的报错，而不是静默不注册。"""
