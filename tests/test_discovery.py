@@ -39,11 +39,10 @@ class TestDiscovery:
         """medication_reminder 没在任何地方手动登记，靠自动扫描注册。"""
         assert skills.get("medication_reminder") is not None
 
-    def test_没写SKILL的包被安静跳过(self):
-        """还没写 SKILL 的占位目录不该导致整个系统起不来。"""
+    def test_呼救模块已注册(self):
+        """呼救实现后应被自动发现。"""
         skipped = skills.skipped_packages()
-        # emergency_call 目前是空占位，应该被跳过而不是报错
-        assert "emergency_call" in skipped
+        assert "emergency_call" not in skipped
         # health_report 已实现并注册，不应再被跳过
         assert "health_report" not in skipped
 
@@ -57,10 +56,11 @@ class TestDiscovery:
         assert skills.all_skills() == []
 
         found = registry.discover("skills", Path(skills.__file__).parent)
-        assert set(found) == {"medication_reminder", "health_report"}
+        assert set(found) == {"medication_reminder", "health_report", "emergency_call"}
         assert set(s.name for s in skills.all_skills()) == {
             "medication_reminder",
             "health_report",
+            "emergency_call",
         }
 
     def test_导出了非BaseSkill的SKILL会报错(self, tmp_path, monkeypatch):

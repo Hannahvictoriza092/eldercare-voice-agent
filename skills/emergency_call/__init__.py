@@ -1,15 +1,13 @@
-"""呼救 skill。
+"""呼救 skill：事件记录、进度查询和待发送通知。"""
 
-============================================================
-⚠️ 这个包目前还是占位。开工步骤见本目录下的 README.md。
-============================================================
+from .executor import EmergencyCallExecutor
+from .schema import CancelParams, CheckProgressParams, ConfirmSafeParams, TriggerParams
+from .skill import EmergencyCallSkill
+from .store import EmergencyStore
 
-【怎么让系统识别到】
-文件都写好后，在下面加这么几行（这就是「注册」动作）：
+SKILL = EmergencyCallSkill()
 
-    from .skill import EmergencyCallSkill
-    SKILL = EmergencyCallSkill()
-
-skills/__init__.py 会自动扫描并注册，不用改任何公共文件。
-在没写 SKILL 之前，这个包会被安静跳过，不影响别人。
-"""
+__all__ = [
+    "SKILL", "EmergencyCallSkill", "EmergencyCallExecutor", "EmergencyStore",
+    "TriggerParams", "CheckProgressParams", "CancelParams", "ConfirmSafeParams",
+]
