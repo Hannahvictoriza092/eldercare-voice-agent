@@ -31,8 +31,12 @@ class EmergencyCallExecutor:
     def __init__(self, store: EmergencyStore | None = None):
         self.store = store if store is not None else EmergencyStore()
 
-    def _result(self, action: str, speech: str, **data) -> SkillResult:
-        return SkillResult(ok=True, skill=SKILL_NAME, action=action, speech=speech, data=data)
+    def _result(self, action: str, speech: str, notifications=None, **data) -> SkillResult:
+        """构造 SkillResult。notifications 走一等字段，不再塞进 data。"""
+        return SkillResult(
+            ok=True, skill=SKILL_NAME, action=action, speech=speech,
+            data=data, notifications=notifications or [],
+        )
 
     def _notification(self, incident: Incident, ctx: SkillContext, title: str,
                       body: str, targets: list[NotifyTarget] | None = None) -> Notification:
@@ -69,8 +73,8 @@ class EmergencyCallExecutor:
             body += f"当前状态：{params.current_condition}。"
         notification = self._notification(incident, ctx, "紧急呼救", body)
         return self._result("trigger", msg.TRIGGERED,
+                            notifications=[notification],
                             incident=incident.model_dump(mode="json"),
-                            notifications=[notification.model_dump(mode="json")],
                             notification_pending=True)
 
     def check_progress(self, params: CheckProgressParams, ctx: SkillContext) -> SkillResult:
@@ -106,8 +110,8 @@ class EmergencyCallExecutor:
                                           f"{ctx.speaker_name}确认取消呼救：{params.reason or '未说明原因'}。",
                                           [NotifyTarget.FAMILY, NotifyTarget.COMMUNITY])
         return self._result("cancel", msg.CANCEL_OK,
+                            notifications=[notification],
                             incident=incident.model_dump(mode="json"),
-                            notifications=[notification.model_dump(mode="json")],
                             notification_pending=True)
 
     def confirm_safe(self, params: ConfirmSafeParams, ctx: SkillContext) -> SkillResult:
@@ -131,8 +135,8 @@ class EmergencyCallExecutor:
                                           f"{ctx.speaker_name}已确认安全，原呼救结束。",
                                           [NotifyTarget.FAMILY, NotifyTarget.COMMUNITY])
         return self._result("confirm_safe", msg.SAFE_OK,
+                            notifications=[notification],
                             incident=incident.model_dump(mode="json"),
-                            notifications=[notification.model_dump(mode="json")],
                             notification_pending=True)
 
     def update_status(self, incident_id: str, status: IncidentStatus,

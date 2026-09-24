@@ -169,7 +169,7 @@ class TestCreate:
         assert r.ok
         assert "阿司匹林" in r.speech
         assert "早上 8 点" in r.speech
-        assert r.data["require_confirm_back"] is True
+        assert r.confirm_level == "repeat"
 
     def test_重复创建会提示而不是堆两条(self, skill):
         create_sample(skill)
@@ -287,7 +287,9 @@ class TestCancel:
         create_sample(skill)
         r = skill.run("cancel", {"medicine_name": "阿司匹林", "reason": "医生让停"}, CTX)
         assert r.ok
-        assert r.data["notify_family"] is True
+        assert len(r.notifications) == 1
+        assert r.notifications[0].targets == ["family"]
+        assert r.confirm_level == "guardian"
         assert skill.run("query", {}, CTX).data["plan"] == []
 
     def test_默认保留历史记录(self, skill):

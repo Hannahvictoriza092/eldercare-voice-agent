@@ -2,7 +2,6 @@
 
 ======================================================================
 ★ 这个文件是三个人一起用的，改动前在群里说一声比较稳。
-★ 状态：草案。标着 TODO-会议 的地方，等三个人一起确认后再定稿。
 ======================================================================
 
 【为什么要有这一层】
@@ -44,13 +43,11 @@ class Contact(BaseModel):
 class Person(BaseModel):
     """一位老人。
 
-    TODO-会议: id 用什么规则？建议统一成字符串 ID（如 elder_01），
-    不建议用姓名当 ID——重名和改名都会出问题。
-    目前用药提醒里的 person 字段是个裸字符串，取值可能是 ID 也可能是姓名，
-    这是个隐患，定稿后建议统一改成 person_id。
+    ★ 定稿：ID 用稳定的字符串标识（如 elder_01），不用姓名当 ID——
+    重名、改名都会出问题。三个 skill 的记录统一用 person_id 引到这儿。
     """
 
-    id: str
+    person_id: str
     name: str                                   # 话术里的称呼，如「张奶奶」
     birth_year: int | None = None
     gender: Literal["male", "female", "unknown"] = "unknown"
@@ -66,10 +63,10 @@ class Person(BaseModel):
     device_id: str | None = None
     voiceprint_id: str | None = None      # 声纹 ID，没做声纹就留空
 
-    # TODO-会议: 是否需要 address（呼救要报位置）？还是每次从设备实时取？
+    # 呼救要报位置；留空时从设备实时取。
     address: str | None = None
 
-    # TODO-会议: 用药提醒是发给老人还是家属设置的？需不需要 guardian_id？
+    # 家属/监护人（给用药提醒、呼救通知用）。
     guardian_id: str | None = None
 
 
@@ -164,7 +161,8 @@ class Incident(BaseModel):
     resolved_at: datetime | None = None
     location: str | None = None           # 事发地点
 
-    # TODO-会议: 呼救到底要通知谁？社区 / 家属 / 120，谁先谁后？
+    # 实际已通知过的对象。由呼救 skill 在生成通知时维护，
+    # 具体顺序（家属/社区/120）由出站层的发送策略决定。
     notified_targets: list[str] = Field(default_factory=list)
 
     detail: dict[str, Any] = Field(default_factory=dict)
@@ -235,10 +233,10 @@ class Notification(BaseModel):
 # 五、SkillResult 的扩展（见 docs/接口约定.md 的说明）
 # ======================================================================
 class ConfirmLevel(str, Enum):
-    """执行前需要多强的确认。替代目前散在 data 字典里的 require_confirm_back。
+    """执行前需要多强的确认。替代散在 data 字典里的 require_confirm_back。
 
-    TODO-会议: 是否采纳？采纳的话要改 common/base.py 的 SkillResult，
-    并且用药提醒的 executor 要跟着改（现在写的是 data["require_confirm_back"]）。
+    ★ 已定稿：写进 SkillResult.confirm_level 一等字段。
+    Agent 层据此决定要不要让老人复述、要不要通知家属。
     """
 
     NONE = "none"               # 直接执行，如纯查询

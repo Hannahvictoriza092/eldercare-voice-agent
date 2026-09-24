@@ -221,7 +221,12 @@ class HealthReportExecutor:
 
     # ---------------- 内部工具 ----------------
     def _ok(self, action: str, speech: str, **data: Any) -> SkillResult:
-        return SkillResult(ok=True, skill=SKILL_NAME, action=action, speech=speech, data=data)
+        # 支持从 data 里摘出 notifications 一等字段。
+        notifications = data.pop("notifications", [])
+        return SkillResult(
+            ok=True, skill=SKILL_NAME, action=action, speech=speech,
+            data=data, notifications=notifications,
+        )
 
     def _followup(self, action: str, question: str, **data: Any) -> SkillResult:
         return SkillResult(
@@ -358,7 +363,7 @@ class HealthReportExecutor:
             speech,
             person_id=person,
             week_start=week_start.isoformat(),
-            notification=notification.model_dump(),
+            notifications=[notification],
         )
 
     # ---------------- 3. query_archive ----------------

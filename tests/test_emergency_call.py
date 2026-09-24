@@ -26,8 +26,9 @@ def test_紧急呼救不等待补充信息且持久化(setup_skill):
     assert "120" in result.speech and "已联系" not in result.speech
     incident_id = result.data["incident"]["id"]
     assert store.get(incident_id).status == IncidentStatus.OPEN
-    assert result.data["notifications"][0]["urgency"] == "critical"
-    assert result.data["notifications"][0]["delivered"] is False
+    # notifications 现在是一等字段，元素是 Notification 对象
+    assert result.notifications[0].urgency == "critical"
+    assert result.notifications[0].delivered is False
     assert EmergencyStore(store.path).get(incident_id) is not None
 
 
@@ -51,7 +52,7 @@ def test_取消和报平安都要求确认并产生后续通知(setup_skill):
     assert pending.need_followup and store.get(first_id).status == IncidentStatus.OPEN
     cancelled = skill.run("cancel", {"confirmed": True, "reason": "按错了"}, ctx)
     assert cancelled.ok and store.get(first_id).status == IncidentStatus.CANCELLED
-    assert cancelled.data["notifications"][0]["related_incident_id"] == first_id
+    assert cancelled.notifications[0].related_incident_id == first_id
     second_id = skill.run("trigger", {}, ctx).data["incident"]["id"]
     safe = skill.run("confirm_safe", {"confirmed": True}, ctx)
     assert safe.ok and store.get(second_id).status == IncidentStatus.RESOLVED

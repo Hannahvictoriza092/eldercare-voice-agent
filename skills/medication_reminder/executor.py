@@ -10,6 +10,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from common.base import SkillContext, SkillResult
+from common.domain import ConfirmLevel, Notification, NotifyTarget, Urgency
 
 from . import messages as msg
 from .schema import (
@@ -38,7 +39,14 @@ class MedicationExecutor:
     # 内部工具
     # ==================================================================
     def _ok(self, action: str, speech: str, **data: Any) -> SkillResult:
-        return SkillResult(ok=True, skill=SKILL_NAME, action=action, speech=speech, data=data)
+        # 支持从 data 里摘出 confirm_level / notifications 两个一等字段，
+        # 避免以后再散落 require_confirm_back / notify_family 这种魔法字符串。
+        confirm_level = data.pop("confirm_level", ConfirmLevel.NONE)
+        notifications = data.pop("notifications", [])
+        return SkillResult(
+            ok=True, skill=SKILL_NAME, action=action, speech=speech,
+            data=data, confirm_level=confirm_level, notifications=notifications,
+        )
 
     def _followup(self, action: str, question: str, **data: Any) -> SkillResult:
         return SkillResult(
@@ -148,8 +156,8 @@ class MedicationExecutor:
             reminder_id=reminder.id,
             medicine_name=reminder.medicine_name,
             times=reminder.times,
-            # 高风险动作，交由 Agent 层决定要不要让老人复述确认
-            require_confirm_back=True,
+            # 新增药是高风险的写操作，交给 Agent 层让老人复述确认
+            confirm_level=ConfirmLevel.REPEAT_BACK,
         )
 
     # ==================================================================
@@ -308,14 +316,28 @@ class MedicationExecutor:
         speech = msg.render(
             msg.CANCEL_OK, person=ctx.speaker_name, medicine=r.medicine_name, reason_hint=hint
         )
+        # 停药是重要事件，要通知家属。产出 Notification 对象（只产出，不负责发送）。
+        from uuid import uuid4
+
+        notification = Notification(
+            id=f"med_{uuid4().hex[:8]}",
+            person_id=person,
+            targets=[NotifyTarget.FAMILY],
+            urgency=Urgency.URGENT,
+            title="停药提醒",
+            body=f"{ctx.speaker_name}取消了 {r.medicine_name} 的用药提醒"
+                 f"{'，原因：' + p.reason if p.reason else ''}。",
+            created_at=ctx.now or datetime.now(),
+        )
         return self._ok(
             "cancel",
             speech,
             reminder_id=r.id,
             medicine_name=r.medicine_name,
             reason=p.reason,
-            # 告知家属：停药是重要事件
-            notify_family=True,
+            notifications=[notification],
+            # 停药涉及医嘱，执行前最好家属确认
+            confirm_level=ConfirmLevel.GUARDIAN,
         )
 
     # ==================================================================

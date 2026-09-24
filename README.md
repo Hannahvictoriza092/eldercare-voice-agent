@@ -200,19 +200,19 @@ medication_reminder_create / _query / _update / _cancel / _confirm_taken
 
 ### 🔴 需要一起定的事（越早越好）
 
-- [ ] `Person.id` 的规则 —— 现在 `person` 是裸字符串，取值可能是 ID 也可能是姓名，**这是个隐患**
-- [ ] 共享事件流存哪、怎么读 —— 健康和照顾反馈会卡在这里
-      （用药提醒侧已备好数据：`taken_log` 现在含 `taken` / `missed` / `skipped` 三种状态）
+- [x] `Person.id` 的规则 —— 已定稿：改名为 `person_id`，用稳定字符串 ID（如 `elder_01`）
+- [x] 共享事件流存哪、怎么读 —— 已落地：`common/event_store.py` 的 `EventStore`（JSONL）
+      （用药提醒和呼救往这里写，健康反馈用 `medication_logs()` / `incidents()` 读）
 - [ ] 把 `CODEOWNERS` 里的占位用户名换成真实 GitHub 用户名
 
 ### 🟠 待办
 
-- [ ] `SkillResult` 增加 `confirm_level` / `notifications` 字段
-      （现在是藏在 `data` 里的 `require_confirm_back` / `notify_family`，靠约定不靠谱）
+- [x] `SkillResult` 增加 `confirm_level` / `notifications` 字段 —— 已定稿，
+      三个 skill 已统一改用一等字段（不再散落 `require_confirm_back` / `notify_family`）
 - [x] 用药提醒的 `taken_log` 改成完整事件流（含漏服记录）—— 已完成，
       漏服在超过 60 分钟时由调度器落库（`MISSED_AFTER_MIN`）
-- [ ] `taken_log` 仍是 `Reminder` 的嵌套字段，没有独立的事件流存储。
-      健康和照顾反馈要跨药查询时会比较别扭，接数据库时建议抽成独立表
+- [ ] 把 `Reminder.taken_log` 和 `EmergencyStore` 的写入接到 `common/event_store.py` 的
+      统一事件流（目前事件流类是独立的，三个 skill 还没往里面写，属于「接线」）
 - [ ] 接入呼救通知出站服务及送达确认、重试；将真实救助进度回写事件
 
 ### 🟡 后期

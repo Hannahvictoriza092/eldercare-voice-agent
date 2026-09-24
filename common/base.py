@@ -22,6 +22,8 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field, ValidationError
 
+from .domain import ConfirmLevel, Notification
+
 
 class RiskLevel(str, Enum):
     """风险等级。Agent 层据此决定要不要二次确认、要不要通知子女。
@@ -63,6 +65,12 @@ class SkillResult(BaseModel):
     need_followup: bool = False            # 参数不全，需要 Qwen 追问老人
     followup_question: str = ""            # 追问话术
     error: str | None = None
+    # 待发送的通知。skill 只产出对象，真正的发送、重试、送达确认
+    # 由上层出站层统一做。三个 skill 都往这里放，出站层只认这一个字段，
+    # 不用再猜藏在 data 里的哪个 key（require_confirm_back / notify_family 那种）。
+    notifications: list[Notification] = Field(default_factory=list)
+    # 执行前需要多强的确认。Agent 层据此决定要不要让老人复述、要不要通知家属。
+    confirm_level: ConfirmLevel = ConfirmLevel.NONE
 
 
 ParamsT = TypeVar("ParamsT", bound=BaseModel)

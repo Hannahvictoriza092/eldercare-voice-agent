@@ -204,10 +204,10 @@ class TestSendReport:
         )
         assert r.ok
         assert "医生" in r.speech
-        notif = r.data["notification"]
-        assert notif["targets"] == ["hospital"]
-        assert "健康周报" in notif["title"]
-        assert "依从率" in notif["body"]
+        notif = r.notifications[0]
+        assert notif.targets == ["hospital"]
+        assert "健康周报" in notif.title
+        assert "依从率" in notif.body
 
     def test_数据不足时不能发送(self, skill):
         r = skill.run(
@@ -217,7 +217,7 @@ class TestSendReport:
         )
         assert r.ok
         assert r.data["insufficient"] is True
-        assert "notification" not in r.data
+        assert r.notifications == []
 
 
 class TestQueryArchive:

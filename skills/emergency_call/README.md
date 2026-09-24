@@ -14,7 +14,7 @@
 ## 接入边界
 
 本 skill 只返回待发送通知，不负责电话、短信或微信发送。`trigger` 返回的
-`SkillResult.data["notifications"]` 是 `Notification` 字典列表；
+`SkillResult.notifications` 是 `Notification` 对象列表（一等字段，不再是字典）；
 `notification_pending=true` 说明尚待出站服务处理。上层必须发送并处理重试，
 在接到真实救援反馈后调用 `EmergencyCallExecutor.update_status()` 写入
 `ACKED`、`EN_ROUTE`、`ARRIVED` 等状态。未接到反馈前，进度查询只会说
@@ -22,7 +22,7 @@
 
 `EmergencyStore` 默认存储在 `data/emergency_incidents.json`，构造时可注入路径。
 它的 `incidents(person_id, start, end)` 可为健康周报提供异常事件；正式的
-跨模块事件流仍需由上层统一接线。存储目前只支持单进程。
+跨模块事件流已由 `common/event_store.py` 的 `EventStore` 统一承载。
 
 ## 验证
 

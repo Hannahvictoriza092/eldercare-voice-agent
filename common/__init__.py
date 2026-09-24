@@ -43,6 +43,7 @@ from .registry import (
     skipped_packages,
     unregister,
 )
+from .event_store import EventStore
 from . import timefmt
 
 __all__ = [
@@ -76,6 +77,8 @@ __all__ = [
     "NotifyTarget",
     "Urgency",
     "ConfirmLevel",
+    # 事件流
+    "EventStore",
     # 工具
     "timefmt",
 ]
