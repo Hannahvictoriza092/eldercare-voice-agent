@@ -499,6 +499,46 @@ class TestTakenLogStore:
         s2 = ReminderStore(path)
         assert s2.get("med_1").missed_slots(date(2026, 9, 19)) == {"08:00"}
 
+    def test_服药记录同步进共享事件流(self, tmp_path):
+        """接线：记服药/漏服后，事件流里能读到对应的 MedicationLog。"""
+        from common.event_store import EventStore
+        from skills.medication_reminder.store import Reminder, ReminderStore
+
+        es = EventStore(tmp_path / "events.jsonl")
+        s = ReminderStore(tmp_path / "reminders.json", event_store=es)
+        s.add(Reminder(
+            id="med_1", person="elder_01", medicine_name="阿司匹林",
+            dosage=1, dosage_unit="tablet", frequency="once_daily",
+            times=["08:00"], start_date="2026-09-19",
+        ))
+        s.log_missed("med_1", date(2026, 9, 19), "08:00", overdue_minutes=90)
+
+        logs = es.medication_logs("elder_01", date(2026, 9, 19), date(2026, 9, 19))
+        assert len(logs) == 1
+        assert logs[0].medicine_name == "阿司匹林"
+        assert logs[0].status.value == "missed"
+
+    def test_补报已服后事件流只保留一条(self, tmp_path):
+        """漏服->补报已服，事件流里同一条记录被覆盖，不产生重复。"""
+        from common.event_store import EventStore
+        from datetime import datetime
+        from skills.medication_reminder.store import Reminder, ReminderStore
+
+        es = EventStore(tmp_path / "events.jsonl")
+        s = ReminderStore(tmp_path / "reminders.json", event_store=es)
+        s.add(Reminder(
+            id="med_1", person="elder_01", medicine_name="阿司匹林",
+            dosage=1, dosage_unit="tablet", frequency="once_daily",
+            times=["08:00"], start_date="2026-09-19",
+        ))
+        s.log_missed("med_1", date(2026, 9, 19), "08:00", overdue_minutes=90)
+        s.log_taken("med_1", date(2026, 9, 19), "08:00",
+                    taken_at=datetime(2026, 9, 19, 10, 30))
+
+        logs = es.medication_logs("elder_01", date(2026, 9, 19), date(2026, 9, 19))
+        assert len(logs) == 1
+        assert logs[0].status.value == "taken"
+
 
 # ======================================================================
 # 4. 注册表 / tool 导出

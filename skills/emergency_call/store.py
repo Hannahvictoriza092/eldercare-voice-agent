@@ -13,8 +13,10 @@ ACTIVE = {IncidentStatus.OPEN, IncidentStatus.ACKED, IncidentStatus.EN_ROUTE,
 
 
 class EmergencyStore:
-    def __init__(self, path: Path | str | None = None):
+    def __init__(self, path: Path | str | None = None, event_store=None):
         self.path = Path(path) if path is not None else DEFAULT_PATH
+        # 共享事件流（可选注入）。save 时顺手 upsert，让健康反馈读到异常事件。
+        self.event_store = event_store
         self._items: dict[str, Incident] = {}
         if self.path.exists():
             for raw in json.loads(self.path.read_text(encoding="utf-8")):
@@ -32,6 +34,9 @@ class EmergencyStore:
         ), encoding="utf-8")
         temp.replace(self.path)
         self._items = items
+        # 同步进共享事件流（幂等：同一 incident.id 状态推进会覆盖）
+        if self.event_store is not None:
+            self.event_store.upsert(incident)
 
     def get(self, incident_id: str) -> Incident | None:
         return self._items.get(incident_id)

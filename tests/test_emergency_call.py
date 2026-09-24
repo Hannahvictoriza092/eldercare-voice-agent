@@ -7,6 +7,7 @@ import pytest
 from common.base import SkillContext
 from common.domain import IncidentStatus
 from skills.emergency_call import EmergencyCallExecutor, EmergencyCallSkill, EmergencyStore
+from skills.emergency_call.schema import TriggerParams
 
 
 @pytest.fixture
@@ -77,3 +78,53 @@ def test_所有工具字段都有说明(setup_skill):
     for tool in tools:
         assert all(prop.get("description") for prop in
                    tool["function"]["parameters"]["properties"].values())
+
+
+def test_事件同步进共享事件流(tmp_path):
+    """接线：触发呼救后，共享事件流里能读到对应的 Incident。"""
+    from datetime import date
+
+    from common.event_store import EventStore
+    from skills.emergency_call import EmergencyCallExecutor, EmergencyStore
+
+    es = EventStore(tmp_path / "events.jsonl")
+    executor = EmergencyCallExecutor(EmergencyStore(tmp_path / "incidents.json", event_store=es))
+    ctx = SkillContext(speaker_id="elder_01", speaker_name="张奶奶",
+                       now=datetime(2026, 9, 24, 10, 0))
+
+    result = executor.trigger(
+        TriggerParams(reason="摔倒", location="家里"), ctx
+    )
+    incident_id = result.data["incident"]["id"]
+
+    incidents = es.incidents("elder_01", date(2026, 9, 24), date(2026, 9, 24))
+    assert len(incidents) == 1
+    assert incidents[0].id == incident_id
+    assert incidents[0].type.value == "sos"
+
+
+def test_事件状态推进覆盖不重复(tmp_path):
+    """呼救状态推进是覆盖同一条，不是新增一条。"""
+    from datetime import date
+
+    from common.event_store import EventStore
+    from skills.emergency_call import EmergencyCallExecutor, EmergencyStore
+
+    es = EventStore(tmp_path / "events.jsonl")
+    executor = EmergencyCallExecutor(EmergencyStore(tmp_path / "incidents.json", event_store=es))
+    ctx = SkillContext(speaker_id="elder_01", speaker_name="张奶奶",
+                       now=datetime(2026, 9, 24, 10, 0))
+
+    result = executor.trigger(TriggerParams(reason="摔倒"), ctx)
+    incident_id = result.data["incident"]["id"]
+    # 走合法状态推进：OPEN -> ACKED -> ARRIVED -> RESOLVED
+    executor.update_status(incident_id, IncidentStatus.ACKED,
+                           ctx.model_copy(update={"now": ctx.now + timedelta(minutes=1)}))
+    executor.update_status(incident_id, IncidentStatus.ARRIVED,
+                           ctx.model_copy(update={"now": ctx.now + timedelta(minutes=2)}))
+    executor.update_status(incident_id, IncidentStatus.RESOLVED,
+                           ctx.model_copy(update={"now": ctx.now + timedelta(minutes=3)}))
+
+    incidents = es.incidents("elder_01", date(2026, 9, 24), date(2026, 9, 24))
+    assert len(incidents) == 1
+    assert incidents[0].status == IncidentStatus.RESOLVED

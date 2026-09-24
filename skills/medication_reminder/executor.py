@@ -32,8 +32,16 @@ MISSED_AFTER_MIN = 60
 
 
 class MedicationExecutor:
-    def __init__(self, store: ReminderStore | None = None):
-        self.store = store or ReminderStore()
+    def __init__(self, store: ReminderStore | None = None, event_store=None):
+        # store 没给时，创建一个带共享事件流的 store，这样服药记录会自动
+        # 同步进事件流，健康和照顾反馈才能读到漏服/服药数据。
+        if store is None:
+            from common.event_store import EventStore
+
+            store = ReminderStore(event_store=event_store or EventStore())
+        elif event_store is not None and store.event_store is None:
+            store.event_store = event_store
+        self.store = store
 
     # ==================================================================
     # 内部工具

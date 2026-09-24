@@ -72,8 +72,8 @@ class MedicationReminderSkill(BaseSkill):
         "confirm_taken": ConfirmTakenParams,
     }
 
-    def __init__(self, store: ReminderStore | None = None):
-        self.executor = MedicationExecutor(store)
+    def __init__(self, store: ReminderStore | None = None, event_store=None):
+        self.executor = MedicationExecutor(store, event_store)
 
     def action_description(self, action: str) -> str:
         base = ACTION_DESCRIPTIONS.get(action, "")

@@ -80,3 +80,33 @@ class TestEventStore:
         store.add(make_log(date(2026, 9, 20)))
         reloaded = EventStore(path)
         assert len(reloaded.all()) == 1
+
+    def test_同一id幂等覆盖(self, tmp_path):
+        """漏服->补报已服应是同一条记录覆盖，不产生重复。"""
+        store = EventStore(tmp_path / "events.jsonl")
+
+        missed = make_log(date(2026, 9, 20), status=MedicationStatus.MISSED)
+        missed.id = "log_fixed"
+        store.add(missed)
+
+        taken = make_log(date(2026, 9, 20), status=MedicationStatus.TAKEN)
+        taken.id = "log_fixed"
+        store.add(taken)
+
+        logs = store.medication_logs("elder_01", date(2026, 9, 20), date(2026, 9, 20))
+        assert len(logs) == 1
+        assert logs[0].status == MedicationStatus.TAKEN
+
+    def test_幂等覆盖跨进程生效(self, tmp_path):
+        """关闭重开后，同一 id 仍只保留最后一条（磁盘 JSONL 加载时去重）。"""
+        path = tmp_path / "events.jsonl"
+        store = EventStore(path)
+        for status in (MedicationStatus.MISSED, MedicationStatus.TAKEN):
+            log = make_log(date(2026, 9, 20), status=status)
+            log.id = "log_fixed"
+            store.add(log)
+
+        reloaded = EventStore(path)
+        logs = reloaded.medication_logs("elder_01", date(2026, 9, 20), date(2026, 9, 20))
+        assert len(logs) == 1
+        assert logs[0].status == MedicationStatus.TAKEN

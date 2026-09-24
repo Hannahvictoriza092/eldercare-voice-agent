@@ -5,14 +5,15 @@
 
 【数据源设计】
 本 skill 是「下游」，消费用药提醒产出的 MedicationLog 和呼救产出的 Incident。
-按约定不 import 其他 skill 的私有模块，而是通过一个抽象的 EventStore 接口读取。
+按约定不 import 其他 skill 的私有模块，而是通过 EventStore 接口读取。
 
     EventStore（共享事件流）
         ├── medication_logs(person_id, start, end) -> list[MedicationLog]
         └── incidents(person_id, start, end)       -> list[Incident]
 
-共享事件流的具体存储还没定稿，所以这里先给一个 InMemoryEventStore 假实现，
-方便测试和联调。等共享事件流定了，只要实现同一个接口，executor 一行都不用改。
+★ 已完成接线：默认数据源就是 common/event_store.py 的落盘 EventStore，
+  用药提醒和呼救会把各自产出 upsert 进同一个事件流，这里直接读真实数据。
+  测试里仍可注入 InMemoryEventStore 造假数据，不用动业务逻辑。
 """
 
 from __future__ import annotations
@@ -216,7 +217,14 @@ class HealthReportExecutor:
         store: EventStore | None = None,
         archive_store: HealthArchiveStore | None = None,
     ):
-        self.store = store or InMemoryEventStore()
+        # 默认接【真正的共享事件流】（common.EventStore），而不是空的内存假实现，
+        # 这样实际运行时能读到用药提醒和呼救产出的真实数据。
+        # 测试里仍可注入 InMemoryEventStore 造数据。
+        if store is None:
+            from common.event_store import EventStore as FileEventStore
+
+            store = FileEventStore()
+        self.store = store
         self.archive_store = archive_store or HealthArchiveStore()
 
     # ---------------- 内部工具 ----------------

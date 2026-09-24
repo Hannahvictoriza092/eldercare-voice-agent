@@ -28,8 +28,14 @@ PROGRESS = {
 
 
 class EmergencyCallExecutor:
-    def __init__(self, store: EmergencyStore | None = None):
-        self.store = store if store is not None else EmergencyStore()
+    def __init__(self, store: EmergencyStore | None = None, event_store=None):
+        if store is None:
+            from common.event_store import EventStore
+
+            store = EmergencyStore(event_store=event_store or EventStore())
+        elif event_store is not None and store.event_store is None:
+            store.event_store = event_store
+        self.store = store
 
     def _result(self, action: str, speech: str, notifications=None, **data) -> SkillResult:
         """构造 SkillResult。notifications 走一等字段，不再塞进 data。"""

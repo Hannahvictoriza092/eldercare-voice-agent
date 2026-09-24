@@ -119,10 +119,13 @@ class Reminder:
 class ReminderStore:
     """提醒的读写。单进程使用，没做并发控制——接数据库时由数据库负责。"""
 
-    def __init__(self, path: Path | str | None = None):
+    def __init__(self, path: Path | str | None = None, event_store=None):
         self.path = Path(path) if path is not None else DEFAULT_PATH
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._items: dict[str, Reminder] = {}
+        # 共享事件流（可选注入）。写了服药记录后，顺手往这里 upsert 一条 MedicationLog，
+        # 让健康和照顾反馈能读到。不注入（None）时行为不变，方便旧测试。
+        self.event_store = event_store
         self._load()
 
     # ---------------- 文件 IO ----------------
@@ -231,6 +234,7 @@ class ReminderStore:
                 log["at"] = (at or datetime.now()).isoformat(timespec="seconds")
                 log["source"] = source
                 self.update(r)
+                self._sync_event_stream(r, day, slot)
                 return True
             return False
 
@@ -245,7 +249,53 @@ class ReminderStore:
             }
         )
         self.update(r)
+        self._sync_event_stream(r, day, slot)
         return True
+
+    def _sync_event_stream(self, r: "Reminder", day: date, slot: str) -> None:
+        """把最新的这条服药记录同步进共享事件流。
+
+        用稳定 id = f"{reminder_id}:{date}:{slot}"，这样漏服->补报已服时
+        是 upsert 覆盖同一条，健康反馈不会把「漏服」「已服」算成两条。
+        """
+        if self.event_store is None:
+            return
+        # 找到这条时间点最新的记录（可能是刚 append 的，也可能是「补报已服」改写后的）
+        d = day.isoformat()
+        latest = None
+        for log in r.taken_log:
+            if log.get("date") == d and log.get("slot") == slot:
+                latest = log
+        if latest is None:
+            return
+
+        from common.domain import MedicationLog, MedicationStatus
+
+        status_map = {
+            STATUS_TAKEN: MedicationStatus.TAKEN,
+            STATUS_MISSED: MedicationStatus.MISSED,
+            STATUS_SKIPPED: MedicationStatus.SKIPPED,
+        }
+        at = latest.get("at")
+        taken_at = datetime.fromisoformat(at) if at else None
+        scheduled = datetime.combine(day, datetime.min.time())
+        # slot 是 "HH:MM"，把时分填进 scheduled_at，让健康反馈能按时间排序
+        hh, mm = slot.split(":")
+        scheduled = scheduled.replace(hour=int(hh), minute=int(mm))
+
+        log = MedicationLog(
+            id=f"{r.id}:{day.isoformat()}:{slot}",
+            person_id=r.person,
+            reminder_id=r.id,
+            medicine_name=r.medicine_name,
+            dosage=r.dosage,
+            dosage_unit=r.dosage_unit,
+            scheduled_at=scheduled,
+            taken_at=taken_at,
+            status=status_map[latest.get("status", STATUS_TAKEN)],
+            source=latest.get("source", "voice"),
+        )
+        self.event_store.upsert(log)
 
     def log_taken(self, reminder_id: str, day: date, slot: str,
                   taken_at: datetime | None = None, source: str = "voice") -> bool:

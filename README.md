@@ -211,8 +211,8 @@ medication_reminder_create / _query / _update / _cancel / _confirm_taken
       三个 skill 已统一改用一等字段（不再散落 `require_confirm_back` / `notify_family`）
 - [x] 用药提醒的 `taken_log` 改成完整事件流（含漏服记录）—— 已完成，
       漏服在超过 60 分钟时由调度器落库（`MISSED_AFTER_MIN`）
-- [ ] 把 `Reminder.taken_log` 和 `EmergencyStore` 的写入接到 `common/event_store.py` 的
-      统一事件流（目前事件流类是独立的，三个 skill 还没往里面写，属于「接线」）
+- [x] 把 `Reminder.taken_log` 和 `EmergencyStore` 的写入接到 `common/event_store.py` 的
+      统一事件流 —— 已完成：用药提醒/呼救写 `upsert`（按 id 幂等），健康反馈默认读真实事件流
 - [ ] 接入呼救通知出站服务及送达确认、重试；将真实救助进度回写事件
 
 ### 🟡 后期
