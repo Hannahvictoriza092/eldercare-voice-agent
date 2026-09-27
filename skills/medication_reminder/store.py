@@ -277,7 +277,9 @@ class ReminderStore:
             STATUS_SKIPPED: MedicationStatus.SKIPPED,
         }
         at = latest.get("at")
-        taken_at = datetime.fromisoformat(at) if at else None
+        taken_at = (datetime.fromisoformat(at)
+                    if at and latest.get("status", STATUS_TAKEN) == STATUS_TAKEN
+                    else None)
         scheduled = datetime.combine(day, datetime.min.time())
         # slot 是 "HH:MM"，把时分填进 scheduled_at，让健康反馈能按时间排序
         hh, mm = slot.split(":")

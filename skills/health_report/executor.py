@@ -103,15 +103,17 @@ class WeeklyStats:
 
     def __init__(self, week_start: date):
         self.week_start = week_start
-        self.planned = 0            # 计划服药次数
-        self.taken = 0              # 按时完成次数
+        self.planned = 0            # 兼容字段：已有记录数，不是应服次数
+        self.taken = 0              # 已服记录数，包括补服
         self.missed = 0             # 漏服次数
+        self.skipped = 0
+        self.pending = 0
         self.missed_medicines: list[str] = []  # 漏服的药名（去重）
         self.incidents = 0          # 异常事件次数
 
     @property
     def adherence(self) -> float | None:
-        """依从率百分比。没有计划服药时返回 None（数据不足）。"""
+        """兼容字段：已服记录占比；不能据此推断按时率或计划完成率。"""
         if self.planned == 0:
             return None
         return round(self.taken / self.planned * 100, 1)
@@ -126,6 +128,10 @@ class WeeklyStats:
             "missed_medicines": list(self.missed_medicines),
             "incidents": self.incidents,
             "adherence": self.adherence,
+            "record_count": self.planned,
+            "taken_ratio": self.adherence,
+            "skipped": self.skipped,
+            "pending": self.pending,
         }
 
 
@@ -139,9 +145,17 @@ def _collect_stats(
 ) -> WeeklyStats:
     """从事件流统计某一周的服药和异常情况。"""
     start, end = _week_range(week_start)
-    stats = WeeklyStats(week_start)
+    return _stats_from_records(
+        store.medication_logs(person_id, start, end),
+        store.incidents(person_id, start, end), week_start,
+    )
 
-    for log in store.medication_logs(person_id, start, end):
+
+def _stats_from_records(
+    logs: list[MedicationLog], incidents: list[Incident], week_start: date,
+) -> WeeklyStats:
+    stats = WeeklyStats(week_start)
+    for log in logs:
         stats.planned += 1
         if log.status == MedicationStatus.TAKEN:
             stats.taken += 1
@@ -149,14 +163,18 @@ def _collect_stats(
             stats.missed += 1
             if log.medicine_name not in stats.missed_medicines:
                 stats.missed_medicines.append(log.medicine_name)
+        elif log.status == MedicationStatus.SKIPPED:
+            stats.skipped += 1
+        elif log.status == MedicationStatus.PENDING:
+            stats.pending += 1
 
-    stats.incidents = len(store.incidents(person_id, start, end))
+    stats.incidents = len(incidents)
     return stats
 
 
-def _trend_text(cur: WeeklyStats, prev: WeeklyStats | None) -> str:
+def _trend_text(cur: WeeklyStats, prev: WeeklySnapshot | None) -> str:
     """生成「与上周对比」的正式文案。"""
-    if prev is None or prev.planned == 0:
+    if prev is None:
         return msg.TREND_NO_PREV
 
     parts: list[str] = []
@@ -185,8 +203,10 @@ def _trend_text(cur: WeeklyStats, prev: WeeklyStats | None) -> str:
         else:
             parts.append(msg.render(msg.TREND_ADHERENCE_SAME, cur=cur.adherence))
 
-    # 漏服对比
-    if cur.missed > prev.missed:
+    # 缺少服药记录不代表零漏服，不据此声称改善。
+    if cur.planned == 0 or prev.planned == 0:
+        parts.append(msg.TREND_MEDICATION_INSUFFICIENT)
+    elif cur.missed > prev.missed:
         parts.append(msg.render(msg.TREND_MISSED_UP, delta=cur.missed - prev.missed))
     elif cur.missed < prev.missed:
         parts.append(msg.render(msg.TREND_MISSED_DOWN, delta=prev.missed - cur.missed))
@@ -258,17 +278,26 @@ class HealthReportExecutor:
         """person_id 是必填字段，但兜底用当前说话人。"""
         return person_id or ctx.speaker_id
 
+    def _report_body(self, person: str, stats: WeeklyStats, ctx: SkillContext) -> str:
+        return msg.render(
+            msg.WEEKLY_BODY,
+            name=ctx.speaker_name,
+            week_range=msg._week_range(stats.week_start),
+            medication=msg.describe_medication(stats.to_dict()),
+            incidents=stats.incidents,
+            trend=_trend_text(stats, self._prev_snapshot(person, stats.week_start)),
+        )
+
     # ---------------- 1. generate_weekly ----------------
     def generate_weekly(self, p: GenerateWeeklyParams, ctx: SkillContext) -> SkillResult:
         person = self._person(p.person_id, ctx)
         week_start = self._resolve_week(p.week_start, ctx)
-        start, end = _week_range(week_start)
         week_range = msg._week_range(week_start)
 
         stats = _collect_stats(self.store, person, week_start)
 
-        # 数据不足：没有计划服药，给「数据不足」提示，不抛错
-        if stats.planned == 0:
+        # 两类记录都没有才判定数据不足；仅有呼救也生成并归档。
+        if stats.planned == 0 and stats.incidents == 0:
             speech = msg.render(
                 msg.WEEKLY_GENERATED_INSUFFICIENT, person=ctx.speaker_name
             )
@@ -282,18 +311,7 @@ class HealthReportExecutor:
             )
 
         # 生成正式周报正文（给医生/子女看）
-        body = msg.render(
-            msg.WEEKLY_BODY,
-            name=ctx.speaker_name,
-            week_range=week_range,
-            planned=stats.planned,
-            taken=stats.taken,
-            adherence=stats.adherence,
-            missed=stats.missed,
-            missed_medicines="、".join(stats.missed_medicines) or "无",
-            incidents=stats.incidents,
-            trend=_trend_text(stats, self._prev_snapshot(person, week_start)),
-        )
+        body = self._report_body(person, stats, ctx)
 
         # 给老人听的一句话摘要
         brief = msg.describe_weekly_brief(
@@ -323,7 +341,7 @@ class HealthReportExecutor:
 
         stats = _collect_stats(self.store, person, week_start)
 
-        if stats.planned == 0:
+        if stats.planned == 0 and stats.incidents == 0:
             speech = msg.render(
                 msg.WEEKLY_GENERATED_INSUFFICIENT, person=ctx.speaker_name
             )
@@ -335,18 +353,7 @@ class HealthReportExecutor:
                 insufficient=True,
             )
 
-        body = msg.render(
-            msg.WEEKLY_BODY,
-            name=ctx.speaker_name,
-            week_range=week_range,
-            planned=stats.planned,
-            taken=stats.taken,
-            adherence=stats.adherence,
-            missed=stats.missed,
-            missed_medicines="、".join(stats.missed_medicines) or "无",
-            incidents=stats.incidents,
-            trend=_trend_text(stats, self._prev_snapshot(person, week_start)),
-        )
+        body = self._report_body(person, stats, ctx)
 
         # 产出 Notification 对象（只产出，不负责发送）
         notification = Notification(
@@ -372,6 +379,7 @@ class HealthReportExecutor:
             person_id=person,
             week_start=week_start.isoformat(),
             notifications=[notification],
+            notification_pending=True,
         )
 
     # ---------------- 3. query_archive ----------------
@@ -415,7 +423,7 @@ class HealthReportExecutor:
             "query_archive",
             speech,
             person_id=person,
-            snapshots=[s.__dict__ for s in snapshots],
+            snapshots=[s.to_dict() for s in snapshots],
         )
 
     # ---------------- 4. query_summary ----------------
@@ -428,69 +436,20 @@ class HealthReportExecutor:
         logs = self.store.medication_logs(person, start, end)
         incidents = self.store.incidents(person, start, end)
 
-        # 没有服药记录
-        if not logs:
-            speech = msg.render(
-                msg.SUMMARY_ADHERENCE_NO_DATA,
-                person=ctx.speaker_name,
-                days=days,
-            )
-            return self._ok(
-                "query_summary",
-                speech,
-                person_id=person,
-                days=days,
-                planned=0,
-                taken=0,
-                missed=0,
-                incidents=len(incidents),
-            )
-
-        planned = len(logs)
-        taken = sum(1 for log in logs if log.status == MedicationStatus.TAKEN)
-        missed = sum(1 for log in logs if log.status == MedicationStatus.MISSED)
-        missed_medicines = sorted(
-            {log.medicine_name for log in logs if log.status == MedicationStatus.MISSED}
+        stats = _stats_from_records(logs, incidents, start)
+        speech = msg.render(
+            msg.SUMMARY_RECORDS, person=ctx.speaker_name, days=days,
+            medication=msg.describe_medication(stats.to_dict()),
         )
-        adherence = round(taken / planned * 100, 1) if planned else None
-
-        # 老人问「吃药按时吗」优先答依从性；有异常事件也顺带提一句
-        if missed:
-            speech = msg.render(
-                msg.SUMMARY_ADHERENCE_MISSED,
-                person=ctx.speaker_name,
-                days=days,
-                missed=missed,
-                missed_medicines="、".join(missed_medicines) or "几种药",
-            )
-        else:
-            speech = msg.render(
-                msg.SUMMARY_ADHERENCE_GOOD,
-                person=ctx.speaker_name,
-                days=days,
-                taken=taken,
-                adherence=adherence,
-            )
-
         if incidents:
             speech += msg.render(
-                msg.SUMMARY_INCIDENT_SOME,
-                person=ctx.speaker_name,
-                days=days,
-                incidents=len(incidents),
+                msg.SUMMARY_INCIDENT_SOME, person=ctx.speaker_name,
+                days=days, incidents=stats.incidents,
             )
-
+        data = stats.to_dict()
+        data.pop("week_start")
         return self._ok(
-            "query_summary",
-            speech,
-            person_id=person,
-            days=days,
-            planned=planned,
-            taken=taken,
-            missed=missed,
-            missed_medicines=missed_medicines,
-            adherence=adherence,
-            incidents=len(incidents),
+            "query_summary", speech, person_id=person, days=days, **data,
         )
 
     # ---------------- 档案辅助 ----------------
@@ -510,6 +469,8 @@ class HealthReportExecutor:
             planned=stats.planned,
             taken=stats.taken,
             missed=stats.missed,
+            skipped=stats.skipped,
+            pending=stats.pending,
             missed_medicines=list(stats.missed_medicines),
             incidents=stats.incidents,
         )
@@ -518,11 +479,8 @@ class HealthReportExecutor:
     def _archive_summary_cn(self, snapshots: list[WeeklySnapshot]) -> str:
         """把多周快照压成一句给老人听的摘要。"""
         latest = snapshots[-1]
-        if latest.adherence is None:
-            return "数据还在积累中"
-        parts = [f"最近 {len(snapshots)} 周服药依从率在 {latest.adherence}% 左右"]
-        if latest.missed:
-            parts.append(f"有 {latest.missed} 次漏服")
+        parts = [f"已保存 {len(snapshots)} 周记录",
+                 msg.describe_medication(latest.to_dict())]
         if latest.incidents:
             parts.append(f"有 {latest.incidents} 起异常情况")
         return "，".join(parts)
@@ -536,10 +494,10 @@ class HealthReportExecutor:
         if first.adherence is None or last.adherence is None:
             return "趋势还不明显"
         if last.adherence > first.adherence:
-            return "依从率在慢慢变好"
+            return "已有记录中的已服占比有所上升，不代表按时率提高"
         if last.adherence < first.adherence:
-            return "依从率有点下滑，得多留意"
-        return "依从率一直挺稳定"
+            return "已有记录中的已服占比有所下降"
+        return "已有记录中的已服占比保持稳定"
 
 
 def uuid4_hex() -> str:

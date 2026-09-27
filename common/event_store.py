@@ -47,7 +47,10 @@ DEFAULT_PATH = Path("data/events.jsonl")
 
 
 class EventStore:
-    """共享事件流的读写。单进程、JSONL 追加写，按 id 幂等覆盖。"""
+    """JSONL 追加写，按 id 幂等覆盖；每次查询重新加载，保证实例间可见。
+
+    当前支持单进程串行写入；刷新不等于并发写锁或多文件事务。
+    """
 
     def __init__(self, path: Path | str | None = None):
         self.path = Path(path) if path is not None else DEFAULT_PATH
@@ -58,6 +61,7 @@ class EventStore:
 
     # ---------------- 文件 IO ----------------
     def _load(self) -> None:
+        items: dict[str, MedicationLog | Incident] = {}
         if not self.path.exists():
             self._items = {}
             return
@@ -72,7 +76,8 @@ class EventStore:
                 continue
             event = _deserialize(raw)
             # 同一 id 后者覆盖前者（加载顺序即写入顺序）
-            self._items[event.id] = event
+            items[event.id] = event
+        self._items = items
 
     def _append_line(self, event: MedicationLog | Incident) -> None:
         payload = event.model_dump(mode="json")
@@ -88,8 +93,8 @@ class EventStore:
           - MedicationLog：状态 missed->taken 就是同一个 id 覆盖
           - Incident：状态推进会覆盖原记录，健康反馈只数到最终态
         """
-        self._items[event.id] = event
         self._append_line(event)
+        self._items[event.id] = event
 
     def add(self, event: MedicationLog | Incident) -> None:
         """别名，兼容早期调用。语义同 upsert。"""
@@ -97,12 +102,14 @@ class EventStore:
 
     # ---------------- 读 ----------------
     def all(self) -> list[MedicationLog | Incident]:
+        self._load()
         return list(self._items.values())
 
     def medication_logs(
         self, person_id: str, start: date, end: date
     ) -> list[MedicationLog]:
         """取某位老人 [start, end] 区间内的服药记录（含漏服/跳过）。"""
+        self._load()
         return [
             e for e in self._items.values()
             if isinstance(e, MedicationLog)
@@ -114,6 +121,7 @@ class EventStore:
         self, person_id: str, start: date, end: date
     ) -> list[Incident]:
         """取某位老人 [start, end] 区间内的异常事件。"""
+        self._load()
         return [
             e for e in self._items.values()
             if isinstance(e, Incident)

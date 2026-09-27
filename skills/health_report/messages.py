@@ -38,8 +38,7 @@ WEEKLY_TITLE = "{name} 健康周报（{week_range}）"
 WEEKLY_BODY = (
     "{name}本周健康情况汇总（{week_range}）：\n"
     "一、服药情况\n"
-    "  计划服药 {planned} 次，按时完成 {taken} 次，依从率 {adherence}%。\n"
-    "  漏服 {missed} 次，涉及：{missed_medicines}。\n"
+    "  {medication}\n"
     "二、异常事件\n"
     "  本周共 {incidents} 起（呼救/跌倒/健康异常）。\n"
     "三、与上周对比\n"
@@ -54,9 +53,9 @@ WEEKLY_BODY_INSUFFICIENT = (
 )
 
 # 趋势描述模板
-TREND_ADHERENCE_UP = "服药依从率较上周上升 {delta} 个百分点（{prev}% → {cur}%）。"
-TREND_ADHERENCE_DOWN = "服药依从率较上周下降 {delta} 个百分点（{prev}% → {cur}%）。"
-TREND_ADHERENCE_SAME = "服药依从率与上周持平（{cur}%）。"
+TREND_ADHERENCE_UP = "已有记录中的已服占比较上周上升 {delta} 个百分点（{prev}% → {cur}%）。"
+TREND_ADHERENCE_DOWN = "已有记录中的已服占比较上周下降 {delta} 个百分点（{prev}% → {cur}%）。"
+TREND_ADHERENCE_SAME = "已有记录中的已服占比与上周持平（{cur}%）。"
 TREND_MISSED_UP = "漏服次数较上周增加 {delta} 次，需关注。"
 TREND_MISSED_DOWN = "漏服次数较上周减少 {delta} 次。"
 TREND_MISSED_SAME = "漏服次数与上周持平。"
@@ -64,30 +63,29 @@ TREND_INCIDENT_UP = "异常事件较上周增加 {delta} 起。"
 TREND_INCIDENT_DOWN = "异常事件较上周减少 {delta} 起。"
 TREND_INCIDENT_SAME = "异常事件与上周持平。"
 TREND_NO_PREV = "上周数据不足，暂无对比。"
+TREND_MEDICATION_INSUFFICIENT = "本周或上周缺少服药记录，暂不比较服药情况。"
 
 
 # ----------------------------------------------------------------------
 # 给老人听的话（口语化）
 # ----------------------------------------------------------------------
 # 快速问答：本周吃药按时吗
-SUMMARY_ADHERENCE_GOOD = (
-    "{person}，最近 {days} 天您吃药挺准时的，{taken} 次都按时吃了，"
-    "依从率 {adherence}%，继续保持哈。"
-)
+SUMMARY_RECORDS = "{person}，最近 {days} 天的情况是：{medication}"
+SUMMARY_ADHERENCE_GOOD = "{person}，最近 {days} 天记录已服 {taken} 次，已有记录中的已服占比 {adherence}%。"
 SUMMARY_ADHERENCE_MISSED = (
-    "{person}，最近 {days} 天您有 {missed} 次忘了吃药，"
+    "{person}，最近 {days} 天记录漏服 {missed} 次，"
     "主要是{missed_medicines}。下回到点我多提醒您几次，您也留意着点。"
 )
 SUMMARY_ADHERENCE_NO_DATA = (
     "{person}，最近 {days} 天我这边没查到您的服药记录，"
-    "是不是还没开始用药呀？"
+    "暂时无法判断服药情况。"
 )
 
 # 快速问答：这周有没有出什么事
-SUMMARY_INCIDENT_NONE = "{person}，最近 {days} 天没出什么异常情况，您可以放心。"
+SUMMARY_INCIDENT_NONE = "{person}，最近 {days} 天暂无异常事件记录。"
 SUMMARY_INCIDENT_SOME = (
     "{person}，最近 {days} 天有 {incidents} 起异常情况，"
-    "我已经记下来了，也会跟您家里人同步。"
+    "已经保存在记录中了。"
 )
 
 # 快速问答：查档案
@@ -103,12 +101,12 @@ WEEKLY_GENERATED = (
     "要发给医生或家里人吗？跟我说一声就行。"
 )
 WEEKLY_GENERATED_INSUFFICIENT = (
-    "{person}，这周的数据还不太够，暂时生成不了完整报告。"
-    "等记录多一些我再帮您整理。"
+    "{person}，这周暂无可汇总的服药或异常事件记录，数据不足。"
+    "暂时无法判断这周的情况。"
 )
 
 # 周报发送成功
-SEND_OK = "{person}，已经把这周的报告发给{targets}了。"
+SEND_OK = "{person}，报告已整理好，待发送给{targets}，目前还没有送达确认。"
 SEND_OK_NO_TARGET = "{person}，报告已经整理好了，您想发给谁呢？医生、家里人还是社区？"
 
 
@@ -127,14 +125,27 @@ def describe_weekly_brief(
     week_range: str,
 ) -> str:
     """给老人听的周报一句话摘要（口语化，不念数字细节）。"""
-    if adherence is None:
-        return f"这周（{week_range}）数据还不太够，暂时整理不了完整报告。"
-    parts = [f"这周（{week_range}）您吃药依从率是 {adherence}%"]
+    parts = [f"这周（{week_range}）暂无服药记录" if adherence is None
+             else f"这周（{week_range}）已有服药记录中的已服占比是 {adherence}%（包括补服）"]
     if missed:
-        parts.append(f"有 {missed} 次忘了吃")
+        parts.append(f"记录漏服 {missed} 次")
     if incidents:
         parts.append(f"有 {incidents} 起异常情况")
     return "，".join(parts) + "。"
+
+
+def describe_medication(stats: dict) -> str:
+    """只描述已落库记录；不把记录覆盖率当成真实服药依从性。"""
+    if stats["record_count"] == 0:
+        return "暂无服药记录，无法判断服药情况。"
+    medicines = "、".join(stats["missed_medicines"]) or "无"
+    return (
+        f"服药记录共 {stats['record_count']} 次，已服 {stats['taken']} 次（包括补服），"
+        f"漏服 {stats['missed']} 次，涉及：{medicines}；"
+        f"主动跳过 {stats['skipped']} 次，待确认 {stats['pending']} 次。"
+        f"已有记录中的已服占比 {stats['taken_ratio']}%。"
+        "记录不一定覆盖全部应服次数，该占比不代表按时率或计划完成率。"
+    )
 
 
 def describe_targets_cn(targets: list[str]) -> str:

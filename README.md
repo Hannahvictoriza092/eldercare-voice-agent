@@ -1,5 +1,14 @@
 # 老人语音助手 · Skill 库
 
+Qwen 文字联调入口：配置好 DASHSCOPE_API_KEY 和 DASHSCOPE_BASE_URL 后，
+运行 python qwen_chat.py，在“你：”后输入自然语言。
+默认数据独立保存在 data/qwen_demo，不修改原业务记录；
+详见 [Qwen文字联调](docs/Qwen文字联调.md)。
+
+自动归档入口：运行 python weekly_scheduler.py 并保持开启，每周一北京时间 08:00 起
+汇总上一周，启动时补跑遗漏历史周。单次执行加 --once。不会发送通知。
+详见 [自动周报调度](docs/自动周报调度.md)。
+
 面向独居老人的语音助手。老人说一句话，系统转成文字，由大模型判断意图，
 调用对应的 skill 并校验参数，最后把结果念回给老人。
 
@@ -15,8 +24,8 @@
 |---|---|---|---|
 | **用药提醒** | `skills/medication_reminder/` | （填名字） | ✅ 已完成，待优化 |
 | **呼救** | `skills/emergency_call/` | （填名字） | ✅ Skill 已实现，真实通知发送待接入 |
-| **健康和照顾反馈** | `skills/health_report/` | （填名字） | ✅ Skill 已实现，跨模块事件流待接入 |
-| **共享契约层** | `common/` | 三个人一起 | ⚠️ 草案待定稿 |
+| **健康和照顾反馈** | `skills/health_report/` | （填名字） | ✅ 已完成事件流读取、周报生成及档案重载闭环 |
+| **共享契约层** | `common/` | 三个人一起 | ✅ 已有共享实体与 JSONL 事件流契约 |
 
 > 📌 每个 skill 文件夹下都有一份 `README.md`，写清了那个模块要做什么、怎么开工。
 > 动手前可以先看自己那份。
@@ -96,13 +105,13 @@ flowchart LR
 |---|---|---|
 | 用药提醒 | `create` / `query` / `update` / `cancel` / `confirm_taken` | 管理用药计划，查询安排并记录服药情况；定时播报还需要上层调度器 |
 | 呼救 | `trigger` / `check_progress` / `cancel` / `confirm_safe` | 立即记录呼救并生成待发送通知；查询已写入的救助状态；确认后取消或报平安 |
-| 健康和照顾反馈 | `generate_weekly` / `send_report` / `query_archive` / `query_summary` | 汇总注入的服药和异常事件数据，生成周报、档案及待发送通知 |
+| 健康和照顾反馈 | `generate_weekly` / `send_report` / `query_archive` / `query_summary` | 实时读取共享事件流中的服药和异常事件记录，生成周报、档案及待发送通知 |
 
 **呼救接入边界：** `trigger` 不要求先补齐原因和地点，也不做二次确认。
 它会返回 `Incident` 和 `Notification`，但仓库目前没有电话、短信或微信出站服务，
 因此执行 skill 本身不会拨打 120，也不代表家属或救助人员已收到消息。
 进度须由上层根据真实反馈调用 `EmergencyCallExecutor.update_status()` 更新。
-事件默认保存在本地 JSON 文件；跨模块共享事件流仍需接线。
+事件默认保存在本地 JSON 文件；跨模块共享事件流已接入，查询时刷新。
 详见 [呼救模块说明](skills/emergency_call/README.md)。
 
 ## 四、快速开始
@@ -134,7 +143,7 @@ python -c "import skills; print([s.name for s in skills.all_skills()])"   # 看�
 |---|---|
 | **第一次动手** | 📄 `docs/上手指南.md`（4 步 10 分钟，只讲怎么开始） |
 | **了解呼救或接入通知服务** | 再读 `skills/emergency_call/README.md` |
-| **写健康和照顾反馈** | 再读 `skills/health_report/README.md`，⚠️ 共享事件流怎么读这块建议先和另外两人对上 |
+| **写健康和照顾反馈** | 再读 `skills/health_report/README.md`，共享事件流接口与统计口径见模块说明 |
 | **所有人** | 写代码前看 `docs/接口约定.md`（一起约定的接口） |
 
 ### 上手最快的路径
@@ -235,3 +244,8 @@ medication_reminder_create / _query / _update / _cancel / _confirm_taken
 | `CONTRIBUTING.md` | 遇到冲突、想了解提交规范时看 |
 | `skills/*/README.md` | 开工前看自己那份 |
 | `common/domain.py` 的注释 | 需要老人/事件/通知这些实体时 |
+
+## 九、跨 Skill 闭环验收
+
+已实现：两个上游写记录 → health_report 下一次查询可见 → 生成并保存周报 → 重启后读取档案。
+逐步修改、字段兼容说明和验收用例见 [闭环验收与修改记录](docs/闭环验收与修改记录.md)。

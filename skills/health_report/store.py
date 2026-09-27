@@ -30,13 +30,23 @@ class WeeklySnapshot:
     """某一周的画像快照。周报生成时落一条，供长期趋势分析。"""
 
     week_start: str                 # 周一起始日 YYYY-MM-DD
-    adherence: float | None         # 依从率百分比，数据不足为 None
-    planned: int = 0                # 计划服药次数
-    taken: int = 0                  # 按时完成次数
+    adherence: float | None         # 兼容字段：已服记录占比，不是按时率/计划完成率
+    planned: int = 0                # 兼容字段：已有服药记录数，不是应服次数
+    taken: int = 0                  # 已服记录数（包括补服）
     missed: int = 0                 # 漏服次数
     missed_medicines: list[str] = field(default_factory=list)  # 漏服的药名
     incidents: int = 0              # 异常事件次数
     generated_at: str = ""          # 生成时间 ISO
+    skipped: int = 0               # 主动跳过
+    pending: int = 0               # 待确认
+
+    def to_dict(self) -> dict[str, Any]:
+        """保留旧字段，并提供口径明确的新字段。"""
+        return {
+            **asdict(self),
+            "record_count": self.planned,
+            "taken_ratio": self.adherence,
+        }
 
 
 @dataclass
@@ -79,19 +89,29 @@ class HealthArchiveStore:
             self.path.rename(self.path.with_suffix(".corrupt.json"))
             self._items = {}
             return
-        self._items = {a["person_id"]: HealthArchive(**a) for a in raw}
+        self._items = {}
+        for a in raw:
+            # JSON 不会自动恢复嵌套 dataclass；旧档案新增字段使用默认值。
+            snapshots = [WeeklySnapshot(**s) for s in a.get("snapshots", [])]
+            snapshots.sort(key=lambda s: s.week_start)
+            archive = HealthArchive(**{**a, "snapshots": snapshots})
+            self._items[archive.person_id] = archive
 
     def _save(self) -> None:
         payload = [asdict(a) for a in self._items.values()]
-        self.path.write_text(
+        temp = self.path.with_suffix(".tmp")
+        temp.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        temp.replace(self.path)
 
     # ---------------- 增删改查 ----------------
     def get(self, person_id: str) -> HealthArchive | None:
+        self._load()
         return self._items.get(person_id)
 
     def all(self) -> list[HealthArchive]:
+        self._load()
         return list(self._items.values())
 
     def get_or_create(self, person_id: str) -> HealthArchive:
@@ -107,6 +127,7 @@ class HealthArchiveStore:
 
     def save_snapshot(self, person_id: str, snapshot: WeeklySnapshot) -> HealthArchive:
         """写入（或覆盖）某一周的画像快照，并更新时间戳。"""
+        self._load()
         archive = self.get_or_create(person_id)
         if not snapshot.generated_at:
             snapshot.generated_at = datetime.now().isoformat(timespec="seconds")
@@ -126,6 +147,7 @@ class HealthArchiveStore:
         return archive
 
     def delete(self, person_id: str) -> bool:
+        self._load()
         if person_id in self._items:
             del self._items[person_id]
             self._save()

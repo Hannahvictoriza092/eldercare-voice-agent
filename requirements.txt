@@ -1,3 +1,4 @@
-# 目前只需要这两个，Python 3.10+ 建议 3.12
+# Python 3.10+ 建议 3.12；openai 用于 Qwen 兼容接口客户端。
 pydantic>=2.0
 pytest>=8.0
+openai>=1.0

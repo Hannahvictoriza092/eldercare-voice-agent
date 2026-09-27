@@ -8,6 +8,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+qwen = ["openai>=1.0"]
 dev = [
     "pytest>=8.0",
 ]

@@ -42,6 +42,23 @@ def make_incident(day: date, person="elder_01") -> Incident:
 
 
 class TestEventStore:
+    def test_existing_reader_sees_other_writers_and_updates(self, tmp_path):
+        path = tmp_path / "events.jsonl"
+        reader, writer, other = EventStore(path), EventStore(path), EventStore(path)
+        day = date(2026, 9, 21)
+        log = make_log(day, status=MedicationStatus.MISSED)
+        writer.upsert(log)
+        other.upsert(make_incident(day))
+        assert len(reader.all()) == 2
+        assert len(reader.incidents("elder_01", day, day)) == 1
+        assert reader.medication_logs("elder_01", day, day)[0].status == MedicationStatus.MISSED
+        writer.upsert(log.model_copy(update={"status": MedicationStatus.TAKEN}))
+        assert reader.medication_logs("elder_01", day, day)[0].status == MedicationStatus.TAKEN
+        assert len(reader.all()) == 2
+        # 文件被清空后必须清掉旧缓存；不能只在旧字典上累加。
+        path.write_text("", encoding="utf-8")
+        assert reader.all() == []
+
     def test_写入后能读回且类型正确(self, tmp_path):
         store = EventStore(tmp_path / "events.jsonl")
         store.add(make_log(date(2026, 9, 20)))

@@ -92,8 +92,8 @@ class MedicationLog(BaseModel):
     ✅ 已完成：用药提醒的 executor.get_due_reminders() 在超过 60 分钟
     （MISSED_AFTER_MIN）时会往 store 的 taken_log 里落一条 status=missed 的记录，
     并带 overdue_minutes。老人事后补报「我吃了」会把那条改成 taken。
-    ⚠️ 待办：taken_log 目前是 Reminder 的嵌套字段，还没有独立的共享事件流存储，
-    健康和照顾反馈要读的话仍需先和用药提醒这边定好读取方式。
+    ✅ taken_log 的变更同步到 common.EventStore；健康反馈查询时刷新共享事件流。
+    taken_at 只在已服状态记录实际服药时间，漏服/跳过时为 None。
     """
 
     id: str

@@ -182,7 +182,9 @@ class TestGenerateWeekly:
     def test_周报正文是正式文案(self, skill_with_data):
         r = skill_with_data.run("generate_weekly", {"person_id": "elder_01"}, CTX)
         body = r.data["report_body"]
-        assert "依从率 66.7%" in body
+        assert "已有记录中的已服占比 66.7%" in body
+        assert "按时完成" not in body
+        assert "计划服药" not in body
         assert "漏服 1 次" in body
         assert "硝苯地平" in body
         assert "异常事件" in body
@@ -207,7 +209,10 @@ class TestSendReport:
         notif = r.notifications[0]
         assert notif.targets == ["hospital"]
         assert "健康周报" in notif.title
-        assert "依从率" in notif.body
+        assert "已服占比" in notif.body
+        assert r.data["notification_pending"] is True
+        assert "待发送" in r.speech
+        assert not notif.delivered and notif.sent_at is None
 
     def test_数据不足时不能发送(self, skill):
         r = skill.run(
@@ -241,14 +246,14 @@ class TestQuerySummary:
         assert r.ok
         assert "记录" in r.speech
 
-    def test_按时吃药时夸老人(self, skill_with_data):
-        """本周 2 次按时、1 次漏服，会提示漏服。"""
+    def test_有漏服记录时提示漏服(self, skill_with_data):
+        """本周 2 次已服、1 次漏服，会提示漏服。"""
         r = skill_with_data.run("query_summary", {"person_id": "elder_01"}, CTX)
         assert r.ok
-        assert "1 次忘了吃药" in r.speech
+        assert "漏服 1 次" in r.speech
         assert "硝苯地平" in r.speech
 
-    def test_全按时时夸老人(self, tmp_path):
+    def test_全已服也不能宣称按时服药(self, tmp_path):
         from skills.health_report import HealthArchiveStore
 
         monday = date(2026, 9, 21)
@@ -262,7 +267,8 @@ class TestQuerySummary:
 
         r = s.run("query_summary", {"person_id": "elder_01"}, CTX)
         assert r.ok
-        assert "挺准时的" in r.speech
+        assert "已服 2 次" in r.speech
+        assert "挺准时的" not in r.speech
         assert "100.0%" in r.speech
 
     def test_有异常事件会顺带提醒(self, skill_with_data):
