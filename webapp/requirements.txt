@@ -1,0 +1,8 @@
+# 可视化演示额外依赖（skill 库本身只需要 pydantic，见仓库根 requirements.txt）
+#
+# 安装：
+#     pip install -r requirements.txt -r webapp/requirements.txt
+#
+# 版本 5.x / 6.x 都支持（app.py 里做了自适应：
+# 6.0 起 css 从 Blocks() 移到 launch()，Chatbot 去掉了 type 参数）。
+gradio>=5.0

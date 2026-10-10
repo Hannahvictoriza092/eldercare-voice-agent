@@ -198,6 +198,10 @@ medication_reminder_create / _query / _update / _cancel / _confirm_taken
 
 ## 七、当前待办
 
+> 📌 **可视化演示已经能跑了**：`python webapp/app.py`（详见 [webapp/README.md](webapp/README.md)）。
+> 做演示时暴露出的接口不一致处，都记在 **[webapp/待对齐细节.md](webapp/待对齐细节.md)** 里，
+> 每条带证据（文件 + 行号）和建议改法，**动手前先过一遍那份列表**。
+
 ### 🔴 需要一起定的事（越早越好）
 
 - [x] `Person.id` 的规则 —— 已定稿：改名为 `person_id`，用稳定字符串 ID（如 `elder_01`）
