@@ -194,6 +194,30 @@ bash train/cluster_status.sh    # 看排队情况与预计开始时间
 sbatch train/train.slurm        # 排上；超时后照原样再提一次
 ```
 
+---
+
+## 九、本地 ↔ 服务器同步
+
+服务器**没装 git**，代码靠手动 scp 传，很容易漂移（本地改了忘了传，或者服务器上直接改的
+被覆盖）。`train/compare_sync.py` 按文件内容哈希做对照：
+
+```bash
+# 1) 本地：生成清单并上传
+python train/compare_sync.py manifest . > manifest.json
+scp manifest.json sei_server:/tmp/
+
+# 2) 服务器：比对（会列出「只在本地」「只在服务器」「内容不同」三类）
+python train/compare_sync.py check . /tmp/manifest.json
+```
+
+输出里 **「只在服务器」那一类要小心**：可能是服务器上直接写的文件（例如
+`qwen_agent.py`、`qwen_web_worker.py`、`tests/test_qwen_*.py` 就只存在于服务器），
+上传时不要整体覆盖目录，只传自己确信要更新的文件。
+
+**换行符不用管**：`.gitattributes` 保证仓库里是 LF，服务器上也是 LF；
+本地 Windows 工作区显示 CRLF 属正常，比对时只差 `\r`，内容哈希归一化后一致。
+
+
 
 ---
 
