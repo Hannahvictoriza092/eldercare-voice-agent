@@ -1,0 +1,14 @@
+# 统一换行符，避免 Windows 上编辑的脚本在 Linux 上执行失败
+# （sbatch 会直接拒绝含 CRLF 的 .slurm 脚本）
+* text=auto
+*.py text eol=lf
+*.sh text eol=lf
+*.slurm text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
+*.cfg text eol=lf
